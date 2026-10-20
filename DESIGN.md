@@ -144,7 +144,7 @@ CI: fast suite on PR (A + ~10 scenarios at k=1); full suite nightly; results tab
 ## 11. Stack
 
 - Orchestration: **LangGraph** (agent node + tool node, checkpointer, `interrupt()` for approval, streaming).
-- LLMs: **Azure OpenAI**, behind a role-based interface (agent / extractor / compressor / judge), deployment per role from config. Probed 2026-10-20 (all passed chat, tool calling, vision, strict JSON schema): US resource `gpt-5`, `gpt-5-mini`, `gpt-5-nano`, `gpt-5.4-mini`, `gpt-5.4-nano`, `o4-mini`; India resource `gpt-5.6-sol`, `gpt-5`, `gpt-5-mini`, `gpt-5-nano`. No 5.5-family deployment exists on either. Proposed roles: agent `gpt-5.6-sol` (India), extractor `gpt-5.4-mini`, compressor `gpt-5.4-nano`, judge `gpt-5` (a different model from the agent). To be settled by eval numbers.
+- LLMs: **Azure OpenAI**, behind a role-based interface (agent / extractor / compressor / judge), deployment per role from config. Probed 2026-10-20 (all passed chat, tool calling, vision, strict JSON schema): US resource `gpt-5`, `gpt-5-mini`, `gpt-5-nano`, `gpt-5.4-mini`, `gpt-5.4-nano`, `o4-mini`; India resource `gpt-5.6-sol`, `gpt-5`, `gpt-5-mini`, `gpt-5-nano`. No 5.5-family deployment exists on either. Confirmed roles: agent `gpt-5.6-sol` (India), extractor `gpt-5.4-mini`, compressor `gpt-5.4-nano`, judge `gpt-5` (a different model from the agent). Confirmed by the user 2026-10-20; may be revisited from eval numbers. The agent runs on the India resource and the other roles on the US resource, so config holds two endpoints.
 - Tracing: **Langfuse cloud**.
 - Backend: FastAPI + SSE. Frontend: small static app (chat, status bar, approval panel, event timeline).
 - Hosting: Hugging Face Spaces (Docker) preferred; Render free as fallback. Public endpoint ⇒ per-session turn cap, upload size cap, rate limit, optional access gate.
@@ -155,5 +155,5 @@ Real production documents are used only for private end-to-end testing from a lo
 
 ## 13. Open items
 
-- Final model per role (proposed in §11; the agent runs on the India resource, the rest on US, so two endpoint configs).
+- Revisit model-per-role after the first eval runs.
 - Doc suite selection (user, later).
