@@ -42,7 +42,7 @@
 
 **Handover** — structured escalation to a human team, ending autonomous handling.
 
-**Tool-result compression** — replacing older tool results in history with short stubs once enough accumulate; reversible via `expand_tool_result`.
+**Tool-result compression** — replacing older tool results in history with short stubs once enough accumulate; near-lossless, originals kept only in the event log.
 
 **Image stubbing** — replacing an uploaded image in history with a text stub once its extraction is done.
 

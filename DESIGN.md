@@ -136,7 +136,7 @@ Judge-vs-agent: use different models where possible.
 - efficiency (trend only): turns, tool calls, tokens
 Run each scenario k=5; report pass@1 and pass^k.
 **C. LLM judge**: tone/clarity of asks; reply faithful to SOP. Pinned judge model, rubric calibrated against ~30 hand-labelled transcripts; agreement published.
-**D. Compression**: (i) *needle-after-compression* — a fact only present in a since-compressed result must still be used correctly (via stub, Case File, or `expand_tool_result`); (ii) no re-ask after compression; (iii) compression off vs on → outcome parity; (iv) compressor fidelity on a labelled set (required identifiers survive).
+**D. Compression**: (i) *needle-after-compression* — a fact only present in a since-compressed result must still be used correctly (via the stub or the Case File); (ii) no re-ask after compression; (iii) compression off vs on → outcome parity; (iv) compressor fidelity on a labelled set (required identifiers survive).
 **E. Regression / adversarial / fault**: failure-mode library (re-ask after dedup, short key not mapping to a canonical type, stale reply replay, doc extracted but never read, verdict flip-flop across turns); prompt injection inside a document; user trying to skip approval; insurer timeout; extraction failure; malformed tool output.
 
 CI: fast suite on PR (A + ~10 scenarios at k=1); full suite nightly; results table committed as `EVALS.md`; gate on zero invariant violations and per-category thresholds.
