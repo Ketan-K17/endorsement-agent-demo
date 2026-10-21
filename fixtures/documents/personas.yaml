@@ -1,0 +1,49 @@
+# One entry per case. Fill with INVENTED values, then edit the documents to match.
+# Keep each case internally consistent (same reg_no / policy_no / names across its docs).
+
+case_01_owner_transfer_clean:
+  insurer: Northwind General
+  policy_no:
+  reg_no:
+  chassis_no:
+  engine_no:
+  vehicle: {make: , model: , variant: , fuel: , seating_capacity: }
+  policy_period: {start: , end: }
+  old_owner: {name: , relative_name: , address: , phone: , email: }
+  new_owner: {name: , relative_name: , address: , phone: , email: , dob: , aadhaar_no: , pan_no: }
+  transfer_date:
+
+case_02_owner_transfer_degraded:
+  insurer: Cedar Mutual
+  # same fields as case_01
+
+case_03_nominee_update:
+  insurer: Halcyon Assurance
+  policy_no:
+  reg_no:
+  policyholder: {name: , address: , phone: , email: , dob: , aadhaar_no: }
+  current_nominee: {name: , relation: , age: }
+  new_nominee: {name: , relation: , age: }
+
+case_04_name_correction_marriage:
+  insurer: Northwind General
+  policy_no:
+  reg_no:
+  old_name:
+  new_name:
+  address:
+  aadhaar_no:
+  proof_type: marriage_certificate   # or gazette_notification
+
+case_05_name_typo:
+  insurer: Cedar Mutual
+  policy_no:
+  reg_no:
+  name_on_policy:     # misspelt
+  correct_name:
+  pan_no:
+
+case_06_wrong_docs:
+  insurer: Halcyon Assurance
+  # reuse a persona from any other case; list which
+  reuse_persona_from:
