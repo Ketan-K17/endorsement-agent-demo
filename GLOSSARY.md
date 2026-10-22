@@ -51,3 +51,9 @@
 **Scenario** — an eval case: persona script + doc fixtures + mock-world config + assertions. **Invariant** — an assertion that must hold in every run.
 
 **pass@1 / pass^k** — probability a single run passes / probability all k runs pass.
+
+**Case folder** — a directory under `fixtures/documents/` holding one customer story's tweaked documents. **Persona** — the invented values in `personas.yaml` that every document in a case must match. **expected.json** — agreed ground-truth values for a case.
+
+**Context tab** — UI view of the full message log: green = still in the current prompt, red = removed from it (kept visible).
+
+**Demo policies picker** — UI list of seeded policies that starts a flow with a pre-filled message.

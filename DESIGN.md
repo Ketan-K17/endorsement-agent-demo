@@ -65,13 +65,14 @@ Small and coarse-grained. Every write goes through a validated tool.
 | | `cross_check(slot_a, slot_b)` | Name / reg-no / chassis consistency |
 | Skills | `load_skill(name)` | Returns `SKILL.md`; catalog lives in this tool's definition |
 | | `read_skill_file(skill, path)` | Reads a file under that skill's `references/`; sandboxed to the skill directory |
-| Conversation | `ask_user(questions[], reason)` | Batched; passes the ask-budget guardrail; logged |
-| | `send_reply(text, kind)` | User-facing message |
+| Conversation | `ask_user(questions[], reason)` | Budget gate + log only (ask budget 3). The question text itself is carried by the model's plain reply. The ack result is trivial and excluded from the compression count |
 | Validation | `validate_case()` | Deterministic checks + LLM pass; receives prior verdict and returns a diff (carry-forward) |
 | Submission | `request_approval(summary)` | Pauses the graph (`interrupt()`); the user approves in the UI |
 | | `submit_to_insurer(case_id)` | Code-enforced: only if `approval.status == approved`; idempotent |
 | | `check_insurer_status(ref)` | Polls the mock insurer state machine (see below) |
 | Escalation | `handover(team, reason, severity)` | Ends autonomous handling with a structured note |
+
+A turn ends when the model emits a plain assistant message with no tool call; that message is the reply (there is no `send_reply` tool, ADR-0010). Parallel tool calls are allowed (§15).
 
 `check_insurer_status`: after submission the insurer responds asynchronously. The mock is a scripted state machine per scenario, e.g. `received → query_raised("seller NOC unclear") → approved → issued`. An insurer query must be turned into a user ask. Drives the last stages of the status bar.
 
@@ -86,8 +87,9 @@ skills/<name>/
 
 Three disclosure levels: catalog line (static prefix) → `SKILL.md` (`load_skill`) → reference file (`read_skill_file`).
 
-Endorsement-type skills: `change-of-owner`, `nominee-update`, `address-change`, `seating-capacity-change`, `ncb-recovery`, `vehicle-detail-correction`, `hypothecation-change`.
-Cross-cutting skills: `document-triage`, `slot-filling-etiquette`, `insurer-queries`, `escalation-policy`.
+v1 type skills (terse; to be iterated): `change-of-owner`, `nominee-update`, `name-correction`.
+Cross-cutting skills (terse): `document-triage`, `slot-filling-etiquette`, `insurer-queries`, `escalation-policy`.
+Roadmap type skills: `seating-capacity-change`, `ncb-recovery` (added later to show a new skill is cheap).
 
 v1 = one change per case. Multi-change (two type skills in one case, shared docs asked once, conflicting rules reconciled) is a roadmap item; the Case File is shaped for it.
 
@@ -102,7 +104,7 @@ Uploaded images stay in context only until `classify_document` and `extract_fiel
 Purpose: demonstrate how context compression should work, not primarily to save tokens.
 
 - **Targets only tool results.** User/assistant messages and tool calls are never touched.
-- **Trigger:** when the number of *uncompressed* tool results in the trajectory reaches `COMPRESS_THRESHOLD` (default **5**, configurable). A result that has been compressed is never counted again and never recompressed.
+- **Trigger:** when the number of *uncompressed* tool results in the trajectory reaches `COMPRESS_THRESHOLD` (default **5**, configurable). A result that has been compressed is never counted again and never recompressed. Parallel results count individually; `ask_user` acks are excluded.
 - **Action:** compress all uncompressed tool results **except the most recent one** (the latest tool call stays raw). Batch, not per-turn, so the cached prefix changes only at compression events.
 - **Near-lossless:** the compressor (a small model, per-tool prompt) removes wording, boilerplate and repeated structure only. It keeps every identifier, value, confidence, decision and error state. Example stub: `[compressed #r12 extract_fields(doc_3): doc_type=RC; reg_no=KA01AB1234; owner="A. Rao"; chassis=…(conf 0.62); engine=…(conf 0.91); issues=none]`.
 - **No restore tool.** Originals are kept in the event log for audit/replay and evals, not exposed to the model. The Case File remains the source of truth for slot values.
@@ -116,9 +118,12 @@ Ask budget (max asks/case; excess forces summarise-or-handover), tool-call cap p
 
 Pure function `render_status(case) -> StatusBar`, serialised two ways: compact text appended to the model call (§2) and JSON streamed to the UI over SSE.
 
-Fields: `stage` (computed from state predicates, never stored), `active_skills`, `docs_checklist[{name,state,reason}]`, `slots{filled,total,low_conf[]}`, `ask_budget{used,max}`, `validation{verdict,changed_since_last}`, `approval{status}`, `insurer{stage,ref}`, `context{uncompressed_tool_results,threshold,last_compressed_at}`, `current_activity` (UI only), `trace_url` (UI only).
+Fields: `stage` (computed from state predicates, never stored), `active_skills`, `docs_checklist[{name,state,reason}]`, `slots{filled,total,low_conf[]}`, `ask_budget{used,max}`, `validation{verdict,changed_since_last}`, `approval{status}`, `insurer{stage,ref}`, `context{uncompressed_tool_results,threshold,last_compressed_at}`, `current_activity` (UI only), `trace_view` (UI only; in-app, not a Langfuse link, ADR-0009).
 
-Stages: Intake → Docs → Validate → Approval → Insurer → Done (or Handover).
+Stages, computed from state in order (never stored):
+Intake (no change request yet) → Docs (required docs not all `accepted`) → Validate (all docs in, no passing verdict) → Approval (verdict passes, no decision) → Insurer (approved, not issued) → Done. Handover applies at any point.
+
+Guardrail defaults (config): ask budget 3 per case; 12 tool calls per turn; `validate_case` is forced before `request_approval`.
 
 ## 9. Approval (interactive)
 
@@ -139,21 +144,59 @@ Run each scenario k=5; report pass@1 and pass^k.
 **D. Compression**: (i) *needle-after-compression* — a fact only present in a since-compressed result must still be used correctly (via the stub or the Case File); (ii) no re-ask after compression; (iii) compression off vs on → outcome parity; (iv) compressor fidelity on a labelled set (required identifiers survive).
 **E. Regression / adversarial / fault**: failure-mode library (re-ask after dedup, short key not mapping to a canonical type, stale reply replay, doc extracted but never read, verdict flip-flop across turns); prompt injection inside a document; user trying to skip approval; insurer timeout; extraction failure; malformed tool output.
 
-CI: fast suite on PR (A + ~10 scenarios at k=1); full suite nightly; results table committed as `EVALS.md`; gate on zero invariant violations and per-category thresholds.
+CI: fast suite on PR (A + ~10 scenarios at k=1); full suite nightly; results table committed as `EVALS.md`; gate on zero invariant violations and per-category thresholds. CI needs a model key.
+
+**v1 scope** (ADR-0012): component evals for classification and extraction on the fixture documents; ~12 scenarios (4 per skill, including one approver rejection, one fraud-looking mismatch, one self-contradicting user, one compression needle); the compression evals; invariants on every run; k=3 nightly, k=1 on PR. Deferred to v1.1: judge calibration, prompt-injection and fault-injection suites.
 
 ## 11. Stack
 
 - Orchestration: **LangGraph** (agent node + tool node, checkpointer, `interrupt()` for approval, streaming).
 - LLMs: **Azure OpenAI**, behind a role-based interface (agent / extractor / compressor / judge), deployment per role from config. Probed 2026-10-20 (all passed chat, tool calling, vision, strict JSON schema): US resource `gpt-5`, `gpt-5-mini`, `gpt-5-nano`, `gpt-5.4-mini`, `gpt-5.4-nano`, `o4-mini`; India resource `gpt-5.6-sol`, `gpt-5`, `gpt-5-mini`, `gpt-5-nano`. No 5.5-family deployment exists on either. Confirmed roles: agent `gpt-5.6-sol` (India), extractor `gpt-5.4-mini`, compressor `gpt-5.4-nano`, judge `gpt-5` (a different model from the agent). Confirmed by the user 2026-10-20; may be revisited from eval numbers. The agent runs on the India resource and the other roles on the US resource, so config holds two endpoints.
-- Tracing: **Langfuse cloud**.
-- Backend: FastAPI + SSE. Frontend: small static app (chat, status bar, approval panel, event timeline).
-- Hosting: Hugging Face Spaces (Docker) preferred; Render free as fallback. Public endpoint ⇒ per-session turn cap, upload size cap, rate limit, optional access gate.
+- Tracing: **Langfuse cloud**, a personal project (not the company's self-hosted instance). Visitors never see Langfuse links (ADR-0009).
+- Backend: FastAPI + SSE. Frontend: one static page (plain HTML/CSS/JS, `EventSource`, no build step).
+- Hosting: Hugging Face Spaces (Docker, `app_port: 7860`, SSE buffering disabled); Render free as fallback. Free tier: ephemeral disk, sleeps after ~48h idle, ~1 min cold start. To re-verify at deploy time.
+- Credentials: the company Azure resources are used for now and may change to personal keys; the role-based config makes that an env-var change (ADR-0011).
 
 ## 12. Test documents
 
-Real production documents are used only for private end-to-end testing from a local stash that is never committed (`.gitignore`d `private_docs/`). The repo ships a curated suite of redacted/synthetic docs chosen later for end users to try.
+Real production documents are used only for private end-to-end testing from a local stash that is never committed (`.gitignore`d `private_docs/`). The repo ships a curated suite of tweaked docs for end users to try, under `fixtures/documents/` (one folder per case, `personas.yaml`, tweak guidelines in its README). Ground truth per case is `expected.json`, agreed after running the extractor.
 
-## 13. Open items
+## 13. Mock world
+
+- Three fictional insurers: Northwind General, Cedar Mutual, Halcyon Assurance.
+- Policy master derived from the tweaked fixture documents (docs first, policies second), about 15 policies, shown in a "Demo policies" picker that drops a starter message into the chat. Unknown numbers return not-found.
+- Rules master mirrors the shape of the production rulebook (classification, insurer, item, upload-or-text, free-text conditions, handover datapoints), invented content: 3 insurers × 3 types, about 40 rows, plus 2–3 invented conditional twists per insurer. The free-text conditions are what the model must interpret.
+- SOP, skills and references are written fresh, terse, from public knowledge; no proprietary text is copied.
+
+## 14. UI
+
+Single static page: chat pane, status bar, approval card, live activity feed (tool events with timings), in-app trace/replay view, and a **Context tab**: the full message log with items still in the current prompt in green and items that have left it (old status bars, compressed originals, stubbed images) kept visible in red. Tokens stream over SSE; the status bar updates after each tool result and at the end of each turn, never mid-token. A static Context page is acceptable if the animated version proves costly.
+
+## 15. Latency, limits and abuse controls
+
+- Target under 90 seconds per user turn. Parallel tool calls enabled (documents classified and extracted concurrently); every tool event is streamed with timing.
+- Per session: 60 model calls and 150k tokens. Per IP: 3 sessions per day. A global daily budget switch. When a cap trips, the UI says so and offers a pre-recorded run.
+- An optional invite code (env var) opens or closes access without a redeploy.
+
+## 16. Events and replay
+
+One event schema feeds the UI feed, the status bar, the Context tab, the replay, the Langfuse trace and the eval assertions (ADR-0008). The user's own session replay works while the session lives. Curated example runs are committed as static event logs. Shareable user-session links are dropped (ephemeral disk).
+
+## 17. Build order
+
+1. Case File, event store, `render_status` with snapshot tests.
+2. Mock world: policies, rules master, insurer state machine.
+3. Tools, then the LangGraph loop with status bar, image stubbing, compression.
+4. Extraction against the fixture documents.
+5. API + SSE, then the UI.
+6. Evals and nightly runs.
+7. Deploy to Spaces with the limits.
+
+## 18. Repo
+
+Public GitHub repo `endorsement-agent`, MIT license, README states all data is synthetic and derived from tweaked documents, and shows the nightly eval table.
+
+## 19. Open items
 
 - Revisit model-per-role after the first eval runs.
-- Doc suite selection (user, later).
+- Final doc set (user supplies tweaked documents per `fixtures/documents/README.md`).
