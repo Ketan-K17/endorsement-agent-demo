@@ -4,7 +4,7 @@ Why this exists, what was decided, and what a new contributor (human or agent) m
 
 ## Origin and goal
 
-The owner maintains production agents for insurance operations (endorsements, claims, payouts) built as deterministic multi-node workflows. This repo rebuilds the **endorsement** agent from scratch as a public portfolio demo, with mocked data, to showcase agent-architecture features: a tool-using (non-deterministic) loop, a skill catalog with progressive disclosure, a derived live status bar, reversible-free tool-result compression, a human approval gate, and an eval harness.
+The owner maintains production agents for insurance operations (endorsements, claims, payouts) built as deterministic multi-node workflows. This repo rebuilds the **endorsement** agent from scratch as a public portfolio demo, with mocked data, to showcase agent-architecture features: a tool-using (non-deterministic) loop, a skill catalog with progressive disclosure, a derived live status bar, near-lossless tool-result compression, a human approval gate, and an eval harness.
 
 The goal is to be **performative, not useful in production**. Most viewers will see the README (with a GIF of one full flow) and the eval results table before, or instead of, trying the live demo. Rank: README/GIF, eval table, live demo.
 
