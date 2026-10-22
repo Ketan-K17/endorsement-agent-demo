@@ -152,10 +152,10 @@ CI: fast suite on PR (A + ~10 scenarios at k=1); full suite nightly; results tab
 
 - Orchestration: **LangGraph** (agent node + tool node, checkpointer, `interrupt()` for approval, streaming).
 - LLMs: **Azure OpenAI**, behind a role-based interface (agent / extractor / compressor / judge), deployment per role from config. Probed 2026-10-20 (all passed chat, tool calling, vision, strict JSON schema): US resource `gpt-5`, `gpt-5-mini`, `gpt-5-nano`, `gpt-5.4-mini`, `gpt-5.4-nano`, `o4-mini`; India resource `gpt-5.6-sol`, `gpt-5`, `gpt-5-mini`, `gpt-5-nano`. No 5.5-family deployment exists on either. Confirmed roles: agent `gpt-5.6-sol` (India), extractor `gpt-5.4-mini`, compressor `gpt-5.4-nano`, judge `gpt-5` (a different model from the agent). Confirmed by the user 2026-10-20; may be revisited from eval numbers. The agent runs on the India resource and the other roles on the US resource, so config holds two endpoints.
-- Tracing: **Langfuse cloud**, a personal project (not the company's self-hosted instance). Visitors never see Langfuse links (ADR-0009).
+- Tracing: **Langfuse cloud**, a personal project (not a self-hosted instance). Visitors never see Langfuse links (ADR-0009).
 - Backend: FastAPI + SSE. Frontend: one static page (plain HTML/CSS/JS, `EventSource`, no build step).
 - Hosting: Hugging Face Spaces (Docker, `app_port: 7860`, SSE buffering disabled); Render free as fallback. Free tier: ephemeral disk, sleeps after ~48h idle, ~1 min cold start. To re-verify at deploy time.
-- Credentials: the company Azure resources are used for now and may change to personal keys; the role-based config makes that an env-var change (ADR-0011).
+- Credentials: an existing Azure OpenAI resource is used for now and may change to personal keys; the role-based config makes that an env-var change (ADR-0011).
 
 ## 12. Test documents
 

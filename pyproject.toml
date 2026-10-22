@@ -1,0 +1,42 @@
+[project]
+name = "endorsement-agent"
+version = "0.0.1"
+description = "Agentic insurance-endorsement assistant: a portfolio demo."
+requires-python = ">=3.12"
+dependencies = [
+    "langgraph",
+    "langchain-openai",
+    "langfuse",
+    "fastapi",
+    "uvicorn[standard]",
+    "sse-starlette",
+    "pydantic>=2",
+    "python-dotenv",
+    "pyyaml",
+    "pillow",
+]
+
+[dependency-groups]
+dev = ["pytest", "pytest-asyncio", "syrupy", "ruff", "mypy", "types-pyyaml"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/endorsement_agent"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "ANN"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
