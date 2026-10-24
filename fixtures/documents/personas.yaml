@@ -1,49 +1,59 @@
-# One entry per case. Fill with INVENTED values, then edit the documents to match.
+# One entry per case. All values are INVENTED; edit the documents to match them.
 # Keep each case internally consistent (same reg_no / policy_no / names across its docs).
+# The mock policy store (src/endorsement_agent/mock_world/data/policies.yaml) must agree with
+# this file; tests/test_mock_world.py fails if they drift.
 
 case_01_owner_transfer_clean:
   insurer: Northwind General
-  policy_no:
-  reg_no:
-  chassis_no:
-  engine_no:
-  vehicle: {make: , model: , variant: , fuel: , seating_capacity: }
-  policy_period: {start: , end: }
-  old_owner: {name: , relative_name: , address: , phone: , email: }
-  new_owner: {name: , relative_name: , address: , phone: , email: , dob: , aadhaar_no: , pan_no: }
-  transfer_date:
+  policy_no: NWG-MOT-240117
+  reg_no: KA05MZ4182
+  chassis_no: MA3EWDE1S00418217
+  engine_no: K12MN4471823
+  vehicle: {make: Maruti Suzuki, model: Swift, variant: VXI, fuel: Petrol, seating_capacity: 5}
+  policy_period: {start: 2026-03-14, end: 2027-03-13}
+  old_owner: {name: Anand Kulkarni, relative_name: S/O Vasant Kulkarni, address: "14, 3rd Cross, Basavanagudi, Bengaluru 560004", phone: "9845012734", email: anand.k@example.com}
+  new_owner: {name: Meera Shetty, relative_name: D/O Prakash Shetty, address: "22, Lakeview Layout, Mysuru 570008", phone: "9900213458", email: meera.s@example.com, dob: 1991-07-22, aadhaar_no: "481527390164", pan_no: QWRTS4821K}
+  transfer_date: 2026-10-09
 
 case_02_owner_transfer_degraded:
   insurer: Cedar Mutual
-  # same fields as case_01
+  policy_no: CDM-PV-5531902
+  reg_no: MH12QX7305
+  chassis_no: MALBM51RLHM730522
+  engine_no: G4LAHM883102
+  vehicle: {make: Hyundai, model: i20, variant: Asta, fuel: Petrol, seating_capacity: 5}
+  policy_period: {start: 2026-06-01, end: 2027-05-31}
+  old_owner: {name: Rohan Deshpande, relative_name: S/O Milind Deshpande, address: "B-702, Sai Heights, Baner, Pune 411045", phone: "9822047719", email: rohan.d@example.com}
+  new_owner: {name: Farhan Qureshi, relative_name: S/O Imran Qureshi, address: "5, Rose Villa, Kothrud, Pune 411038", phone: "9767301284", email: farhan.q@example.com, dob: 1988-02-11, aadhaar_no: "736204918552", pan_no: BXCPQ7314L}
+  transfer_date: 2026-10-02
 
 case_03_nominee_update:
   insurer: Halcyon Assurance
-  policy_no:
-  reg_no:
-  policyholder: {name: , address: , phone: , email: , dob: , aadhaar_no: }
-  current_nominee: {name: , relation: , age: }
-  new_nominee: {name: , relation: , age: }
+  policy_no: HLA/MC/88104577
+  reg_no: TN09KV2261
+  policyholder: {name: Lakshmi Narayanan, address: "41, Bharathi Street, Mylapore, Chennai 600004", phone: "9884127703", email: lakshmi.n@example.com, dob: 1979-11-03, aadhaar_no: "592018736420"}
+  current_nominee: {name: Suresh Narayanan, relation: spouse, age: 49}
+  new_nominee: {name: Divya Narayanan, relation: daughter, age: 22}
 
 case_04_name_correction_marriage:
   insurer: Northwind General
-  policy_no:
-  reg_no:
-  old_name:
-  new_name:
-  address:
-  aadhaar_no:
+  policy_no: NWG-MOT-239864
+  reg_no: KA03NP6619
+  old_name: Priya Hegde
+  new_name: Priya Kamath
+  address: "8, Temple Road, Malleshwaram, Bengaluru 560003"
+  aadhaar_no: "307719284465"
   proof_type: marriage_certificate   # or gazette_notification
 
 case_05_name_typo:
   insurer: Cedar Mutual
-  policy_no:
-  reg_no:
-  name_on_policy:     # misspelt
-  correct_name:
-  pan_no:
+  policy_no: CDM-PV-5529417
+  reg_no: GJ01RT8840
+  name_on_policy: Jignesh Pattel     # misspelt
+  correct_name: Jignesh Patel
+  pan_no: CMNPP5520H
 
 case_06_wrong_docs:
   insurer: Halcyon Assurance
   # reuse a persona from any other case; list which
-  reuse_persona_from:
+  reuse_persona_from: case_03_nominee_update

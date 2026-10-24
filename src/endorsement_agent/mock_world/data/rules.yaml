@@ -1,0 +1,72 @@
+# Mock rules master. Invented content; only the shape (type, insurer, item, mode, free-text
+# condition, handover conditions) mirrors a real rulebook.
+# mode: upload = a document of that type; text = a slot the customer states.
+# condition: free text the agent must interpret; a row with a condition can be waived, one
+# without cannot. note: guidance shown to the agent, never enforced.
+
+doc_types: [policy_copy, rc, aadhaar, pan, transfer_form, noc, inspection_report, nominee_id, name_change_proof]
+
+terms:
+  - {type: change-of-owner, insurer: Northwind General, fee_inr: 150, tat_days: 3, handover_if: ["policy is lapsed", "seller on the RC is not the policyholder"]}
+  - {type: change-of-owner, insurer: Cedar Mutual,      fee_inr: 100, tat_days: 5, handover_if: ["policy is lapsed", "new owner is a company and no authorisation letter is given"]}
+  - {type: change-of-owner, insurer: Halcyon Assurance, fee_inr: 0,   tat_days: 2, handover_if: ["policy is lapsed", "transfer happened before the policy start date"]}
+  - {type: nominee-update,  insurer: Northwind General, fee_inr: 0,   tat_days: 1, handover_if: ["policy is lapsed"]}
+  - {type: nominee-update,  insurer: Cedar Mutual,      fee_inr: 0,   tat_days: 2, handover_if: ["policy is lapsed", "policyholder is a company"]}
+  - {type: nominee-update,  insurer: Halcyon Assurance, fee_inr: 50,  tat_days: 2, handover_if: ["policy is lapsed"]}
+  - {type: name-correction, insurer: Northwind General, fee_inr: 0,   tat_days: 2, handover_if: ["policy is lapsed", "new name shares no part with the old name"]}
+  - {type: name-correction, insurer: Cedar Mutual,      fee_inr: 0,   tat_days: 3, handover_if: ["policy is lapsed"]}
+  - {type: name-correction, insurer: Halcyon Assurance, fee_inr: 75,  tat_days: 2, handover_if: ["policy is lapsed", "name on the RC differs from both the old and the new name"]}
+
+rows:
+  # change-of-owner
+  - {type: change-of-owner, insurer: Northwind General, item: rc, mode: upload, note: "RC already transferred, in the new owner's name"}
+  - {type: change-of-owner, insurer: Northwind General, item: transfer_form, mode: upload, note: "Form 29/30 or a transfer letter signed by both parties"}
+  - {type: change-of-owner, insurer: Northwind General, item: aadhaar, mode: upload, note: "new owner, front and back"}
+  - {type: change-of-owner, insurer: Northwind General, item: noc, mode: upload, condition: "only if the policy shows a financier (hypothecation)"}
+  - {type: change-of-owner, insurer: Northwind General, item: inspection_report, mode: upload, condition: "only if the transfer date is more than 14 days ago"}
+  - {type: change-of-owner, insurer: Northwind General, item: new_owner_name, mode: text}
+  - {type: change-of-owner, insurer: Northwind General, item: new_owner_phone, mode: text}
+  - {type: change-of-owner, insurer: Northwind General, item: transfer_date, mode: text}
+  - {type: change-of-owner, insurer: Cedar Mutual, item: rc, mode: upload, note: "RC already transferred, in the new owner's name"}
+  - {type: change-of-owner, insurer: Cedar Mutual, item: transfer_form, mode: upload, note: "Form 29/30 only; a plain letter is not accepted"}
+  - {type: change-of-owner, insurer: Cedar Mutual, item: aadhaar, mode: upload, note: "new owner, front and back"}
+  - {type: change-of-owner, insurer: Cedar Mutual, item: pan, mode: upload, condition: "only if the new owner is a company or the vehicle is a commercial vehicle"}
+  - {type: change-of-owner, insurer: Cedar Mutual, item: new_owner_name, mode: text}
+  - {type: change-of-owner, insurer: Cedar Mutual, item: new_owner_phone, mode: text}
+  - {type: change-of-owner, insurer: Cedar Mutual, item: transfer_date, mode: text}
+  - {type: change-of-owner, insurer: Halcyon Assurance, item: rc, mode: upload, note: "RC already transferred, in the new owner's name"}
+  - {type: change-of-owner, insurer: Halcyon Assurance, item: aadhaar, mode: upload, note: "new owner, front and back"}
+  - {type: change-of-owner, insurer: Halcyon Assurance, item: pan, mode: upload, note: "new owner"}
+  - {type: change-of-owner, insurer: Halcyon Assurance, item: noc, mode: upload, condition: "only if the policy shows a financier; the NOC must name the new owner"}
+  - {type: change-of-owner, insurer: Halcyon Assurance, item: new_owner_name, mode: text}
+  - {type: change-of-owner, insurer: Halcyon Assurance, item: new_owner_email, mode: text}
+  # nominee-update
+  - {type: nominee-update, insurer: Northwind General, item: aadhaar, mode: upload, note: "policyholder"}
+  - {type: nominee-update, insurer: Northwind General, item: nominee_name, mode: text}
+  - {type: nominee-update, insurer: Northwind General, item: nominee_relation, mode: text}
+  - {type: nominee-update, insurer: Northwind General, item: nominee_age, mode: text}
+  - {type: nominee-update, insurer: Cedar Mutual, item: aadhaar, mode: upload, note: "policyholder"}
+  - {type: nominee-update, insurer: Cedar Mutual, item: nominee_name, mode: text}
+  - {type: nominee-update, insurer: Cedar Mutual, item: nominee_relation, mode: text}
+  - {type: nominee-update, insurer: Cedar Mutual, item: nominee_age, mode: text}
+  - {type: nominee-update, insurer: Cedar Mutual, item: appointee_name, mode: text, condition: "only if the nominee is under 18"}
+  - {type: nominee-update, insurer: Halcyon Assurance, item: policy_copy, mode: upload}
+  - {type: nominee-update, insurer: Halcyon Assurance, item: aadhaar, mode: upload, note: "policyholder"}
+  - {type: nominee-update, insurer: Halcyon Assurance, item: nominee_id, mode: upload, condition: "only if the nominee is not a spouse, child or parent"}
+  - {type: nominee-update, insurer: Halcyon Assurance, item: nominee_name, mode: text}
+  - {type: nominee-update, insurer: Halcyon Assurance, item: nominee_relation, mode: text}
+  - {type: nominee-update, insurer: Halcyon Assurance, item: nominee_age, mode: text}
+  # name-correction
+  - {type: name-correction, insurer: Northwind General, item: rc, mode: upload, note: "must show the corrected name"}
+  - {type: name-correction, insurer: Northwind General, item: aadhaar, mode: upload}
+  - {type: name-correction, insurer: Northwind General, item: name_change_proof, mode: upload, condition: "only if the name changed legally (marriage, gazette), not for a spelling fix"}
+  - {type: name-correction, insurer: Northwind General, item: correct_name, mode: text}
+  - {type: name-correction, insurer: Cedar Mutual, item: rc, mode: upload, note: "must show the corrected name"}
+  - {type: name-correction, insurer: Cedar Mutual, item: pan, mode: upload, condition: "only if the correction is a spelling fix; a legal change needs name_change_proof instead"}
+  - {type: name-correction, insurer: Cedar Mutual, item: name_change_proof, mode: upload, condition: "only if the name changed legally (marriage, gazette)"}
+  - {type: name-correction, insurer: Cedar Mutual, item: correct_name, mode: text}
+  - {type: name-correction, insurer: Halcyon Assurance, item: rc, mode: upload, note: "must show the corrected name"}
+  - {type: name-correction, insurer: Halcyon Assurance, item: aadhaar, mode: upload}
+  - {type: name-correction, insurer: Halcyon Assurance, item: policy_copy, mode: upload}
+  - {type: name-correction, insurer: Halcyon Assurance, item: name_change_proof, mode: upload, condition: "only if the name changed legally (marriage, gazette)"}
+  - {type: name-correction, insurer: Halcyon Assurance, item: correct_name, mode: text}

@@ -53,9 +53,9 @@ Model assignment (ADR-0007): agent `gpt-5.6-sol` (India resource); extractor `gp
 Update this block when a step finishes.
 
 - [x] Design, glossary, ADRs 0001–0012, fixture folders
-- [ ] 1. Case File, event store, `render_status` + snapshot tests  ← next
-- [ ] 2. Mock world: policies, rules master, insurer state machine
-- [ ] 3. Tools + LangGraph loop + status bar + image stubbing + compression
+- [x] 1. Case File, event store, `render_status` + snapshot tests (ADR-0013)
+- [x] 2. Mock world: policies, rules master, insurer state machine (ADR-0014)
+- [ ] 3. Tools + LangGraph loop + status bar + image stubbing + compression  ← next
 - [ ] 4. Extraction against fixture documents (needs tweaked docs from the user)
 - [ ] 5. API + SSE + UI
 - [ ] 6. Evals + nightly runs
@@ -63,6 +63,6 @@ Update this block when a step finishes.
 
 ## Waiting on the user
 
-- Tweaked documents per `fixtures/documents/README.md` (start with cases 01, 03, 05) and `personas.yaml`.
+- Tweaked documents per `fixtures/documents/README.md` (start with cases 01, 03, 05), matching the drafted `personas.yaml`. Needed at step 4.
 - Personal Langfuse project credentials (needed from step 3).
 - `.env` with Azure credentials for the roles above.

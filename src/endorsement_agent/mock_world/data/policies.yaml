@@ -1,0 +1,150 @@
+# Mock policy master. All values invented. The first five match fixtures/documents/personas.yaml.
+# status defaults to active and is explicit, so evals don't drift with the real date.
+# Twists: HLA/MC/88107702 is lapsed; KA51HB3307 is hypothecated; 9611048820 holds two policies.
+
+- policy_no: NWG-MOT-240117   # case_01
+  insurer: Northwind General
+  reg_no: KA05MZ4182
+  chassis_no: MA3EWDE1S00418217
+  engine_no: K12MN4471823
+  vehicle: {make: Maruti Suzuki, model: Swift, variant: VXI, fuel: Petrol, seating_capacity: 5}
+  period: {start: 2026-03-14, end: 2027-03-13}
+  holder: {name: Anand Kulkarni, phone: "9845012734", email: anand.k@example.com, address: "14, 3rd Cross, Basavanagudi, Bengaluru 560004"}
+  nominee: {name: Sunanda Kulkarni, relation: spouse, age: 58}
+
+- policy_no: CDM-PV-5531902   # case_02
+  insurer: Cedar Mutual
+  reg_no: MH12QX7305
+  chassis_no: MALBM51RLHM730522
+  engine_no: G4LAHM883102
+  vehicle: {make: Hyundai, model: i20, variant: Asta, fuel: Petrol, seating_capacity: 5}
+  period: {start: 2026-06-01, end: 2027-05-31}
+  holder: {name: Rohan Deshpande, phone: "9822047719", email: rohan.d@example.com, address: "B-702, Sai Heights, Baner, Pune 411045"}
+
+- policy_no: HLA/MC/88104577  # case_03
+  insurer: Halcyon Assurance
+  reg_no: TN09KV2261
+  chassis_no: MBJB29BT6KD226140
+  engine_no: 1NRX2261904
+  vehicle: {make: Toyota, model: Glanza, variant: G, fuel: Petrol, seating_capacity: 5}
+  period: {start: 2026-01-20, end: 2027-01-19}
+  holder: {name: Lakshmi Narayanan, phone: "9884127703", email: lakshmi.n@example.com, address: "41, Bharathi Street, Mylapore, Chennai 600004"}
+  nominee: {name: Suresh Narayanan, relation: spouse, age: 49}
+
+- policy_no: NWG-MOT-239864   # case_04
+  insurer: Northwind General
+  reg_no: KA03NP6619
+  chassis_no: MAT612054LKN66192
+  engine_no: 3G13NP661955
+  vehicle: {make: Tata, model: Tiago, variant: XZ, fuel: Petrol, seating_capacity: 5}
+  period: {start: 2026-08-05, end: 2027-08-04}
+  holder: {name: Priya Hegde, phone: "9741308826", email: priya.h@example.com, address: "8, Temple Road, Malleshwaram, Bengaluru 560003"}
+  nominee: {name: Ramesh Hegde, relation: father, age: 61}
+
+- policy_no: CDM-PV-5529417   # case_05
+  insurer: Cedar Mutual
+  reg_no: GJ01RT8840
+  chassis_no: MA1TA2HN4P2884013
+  engine_no: HN4P288407
+  vehicle: {make: Mahindra, model: XUV300, variant: W8, fuel: Diesel, seating_capacity: 5}
+  period: {start: 2026-04-11, end: 2027-04-10}
+  holder: {name: Jignesh Pattel, phone: "9824516630", email: jignesh.p@example.com, address: "17, Shanti Nagar, Navrangpura, Ahmedabad 380009"}
+
+- policy_no: NWG-MOT-241530
+  insurer: Northwind General
+  reg_no: KA51HB3307
+  chassis_no: MA3FJEB1S00330711
+  engine_no: D13A3307162
+  vehicle: {make: Maruti Suzuki, model: Brezza, variant: ZXI, fuel: Petrol, seating_capacity: 5}
+  period: {start: 2026-09-01, end: 2027-08-31}
+  holder: {name: Kiran Rao, phone: "9611048820", email: kiran.r@example.com, address: "301, Palm Grove, HSR Layout, Bengaluru 560102"}
+  hypothecated_to: Lakeside Finance Ltd
+
+- policy_no: NWG-TW-118842
+  insurer: Northwind General
+  reg_no: KA51EK9014
+  chassis_no: ME4JF50A8NT901455
+  engine_no: JF50ET9014388
+  vehicle: {make: Honda, model: Activa, variant: 6G, fuel: Petrol, seating_capacity: 2}
+  period: {start: 2026-02-17, end: 2027-02-16}
+  holder: {name: Kiran Rao, phone: "9611048820", email: kiran.r@example.com, address: "301, Palm Grove, HSR Layout, Bengaluru 560102"}
+
+- policy_no: NWG-MOT-237702
+  insurer: Northwind General
+  reg_no: KA02MK5548
+  chassis_no: MAKGM663KNN554806
+  engine_no: L15ZN5548201
+  vehicle: {make: Honda, model: City, variant: VX, fuel: Petrol, seating_capacity: 5}
+  period: {start: 2025-12-01, end: 2026-11-30}
+  holder: {name: Sameer Joshi, phone: "9886370451", email: sameer.j@example.com, address: "56, 9th Main, Jayanagar, Bengaluru 560041"}
+  nominee: {name: Neha Joshi, relation: spouse, age: 36}
+
+- policy_no: CDM-PV-5540288
+  insurer: Cedar Mutual
+  reg_no: MH14GT2093
+  chassis_no: MA1ZN2GL5N2209317
+  engine_no: GLN220931
+  vehicle: {make: Mahindra, model: Thar, variant: LX, fuel: Diesel, seating_capacity: 4}
+  period: {start: 2026-07-15, end: 2027-07-14}
+  holder: {name: Aditi Kulkarni, phone: "9970215543", email: aditi.k@example.com, address: "12, Sector 25, Nigdi, Pune 411044"}
+  hypothecated_to: Westbridge Bank
+
+- policy_no: CDM-PV-5512076
+  insurer: Cedar Mutual
+  reg_no: GJ05PL1176
+  chassis_no: MALC381CLKM117620
+  engine_no: G4FGKM117644
+  vehicle: {make: Hyundai, model: Creta, variant: SX, fuel: Diesel, seating_capacity: 5}
+  period: {start: 2026-05-20, end: 2027-05-19}
+  holder: {name: Hetal Shah, phone: "9898041127", email: hetal.s@example.com, address: "9, Ambika Society, Adajan, Surat 395009"}
+  nominee: {name: Mihir Shah, relation: son, age: 15}
+
+- policy_no: CDM-CV-7700315
+  insurer: Cedar Mutual
+  reg_no: MH04TR8812
+  chassis_no: MAT448023N3P88127
+  engine_no: 497SP88127
+  vehicle: {make: Tata, model: Ace Gold, variant: Petrol CX, fuel: Petrol, seating_capacity: 2}
+  period: {start: 2026-03-01, end: 2027-02-28}
+  holder: {name: Shree Ganesh Logistics LLP, phone: "9819023376", email: accounts@sgl.example.com, address: "Unit 4, Turbhe MIDC, Navi Mumbai 400705"}
+
+- policy_no: HLA/MC/88107702
+  insurer: Halcyon Assurance
+  reg_no: TN22AZ4410
+  chassis_no: MA3ERLF1S00441027
+  engine_no: K15BN4410733
+  vehicle: {make: Maruti Suzuki, model: Ertiga, variant: VXI, fuel: CNG, seating_capacity: 7}
+  period: {start: 2025-09-10, end: 2026-09-09}
+  status: lapsed
+  holder: {name: Karthik Subramanian, phone: "9940317685", email: karthik.s@example.com, address: "3, Anna Nagar West, Chennai 600040"}
+  nominee: {name: Revathi Subramanian, relation: spouse, age: 41}
+
+- policy_no: HLA/MC/88109930
+  insurer: Halcyon Assurance
+  reg_no: KL07CD5521
+  chassis_no: MBHCZFB3SNG552190
+  engine_no: K12NG552190
+  vehicle: {make: Maruti Suzuki, model: Baleno, variant: Zeta, fuel: Petrol, seating_capacity: 5}
+  period: {start: 2026-10-01, end: 2027-09-30}
+  holder: {name: Anitha Thomas, phone: "9447120938", email: anitha.t@example.com, address: "Thomas Villa, Kakkanad, Kochi 682030"}
+  nominee: {name: George Thomas, relation: spouse, age: 45}
+
+- policy_no: HLA/TW/40221186
+  insurer: Halcyon Assurance
+  reg_no: TN10BX7783
+  chassis_no: ME3J3A5F2NC778301
+  engine_no: J3A5FC778301
+  vehicle: {make: Royal Enfield, model: Classic 350, variant: Signals, fuel: Petrol, seating_capacity: 2}
+  period: {start: 2026-04-02, end: 2027-04-01}
+  holder: {name: Vignesh Raman, phone: "9789056214", email: vignesh.r@example.com, address: "27, Velachery Main Road, Chennai 600042"}
+
+- policy_no: HLA/MC/88111048
+  insurer: Halcyon Assurance
+  reg_no: AP09EF6630
+  chassis_no: MA1TB2RB8P2663015
+  engine_no: RBP266301
+  vehicle: {make: Mahindra, model: Scorpio N, variant: Z6, fuel: Diesel, seating_capacity: 7}
+  period: {start: 2026-06-25, end: 2027-06-24}
+  holder: {name: Srinivas Reddy, phone: "9848062417", email: srinivas.r@example.com, address: "Plot 44, Banjara Hills, Hyderabad 500034"}
+  hypothecated_to: Lakeside Finance Ltd
+  nominee: {name: Padma Reddy, relation: spouse, age: 52}
