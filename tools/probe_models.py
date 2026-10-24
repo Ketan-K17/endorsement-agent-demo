@@ -46,7 +46,9 @@ def _png(width: int = 64, height: int = 64) -> str:
     return base64.b64encode(png).decode()
 
 
-def _call(endpoint: str, key: str, path: str, body: dict | None = None) -> tuple[int, object, float]:
+def _call(
+    endpoint: str, key: str, path: str, body: dict | None = None
+) -> tuple[int, object, float]:
     request = urllib.request.Request(
         endpoint.rstrip("/") + path,
         data=json.dumps(body).encode() if body else None,
@@ -122,7 +124,8 @@ def main() -> int:
 
     deployments = sys.argv[1:]
     if not deployments:
-        status, body, _ = _call(endpoint, key, f"/openai/deployments?api-version={LIST_API_VERSION}")
+        path = f"/openai/deployments?api-version={LIST_API_VERSION}"
+        status, body, _ = _call(endpoint, key, path)
         if status != 200 or not isinstance(body, dict):
             print(f"Could not list deployments (HTTP {status}); pass names explicitly.")
             return 1

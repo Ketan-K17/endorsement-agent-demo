@@ -37,6 +37,9 @@ target-version = "py312"
 [tool.ruff.lint]
 select = ["E", "F", "I", "B", "UP", "ANN"]
 
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["ANN401"]  # fakes mirror LangChain's Any-typed signatures
+
 [tool.mypy]
 python_version = "3.12"
 strict = true

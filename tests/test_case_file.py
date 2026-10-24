@@ -5,6 +5,7 @@ import pytest
 from endorsement_agent.case_file import apply, fold
 from endorsement_agent.event_store import EventStore
 from endorsement_agent.events import (
+    COMPRESS_MIN_CHARS,
     CaseCreated,
     CaseEvent,
     ContextCompressed,
@@ -64,11 +65,17 @@ def test_superseded_slot_keeps_latest(clock: Clock) -> None:
     assert (slot.value, slot.supersede_reason) == ("MA1XX0001", "user corrected OCR")
 
 
-def test_context_counts_exclude_ask_user_and_compressed(clock: Clock) -> None:
+LONG = "x" * COMPRESS_MIN_CHARS
+
+
+def test_context_counts_exclude_ask_user_short_and_compressed(clock: Clock) -> None:
     events: list[CaseEvent] = [CaseCreated(ts=T0, case_id="c", compress_threshold=5)]
     for i in range(5):
-        events.append(ToolResultAdded(ts=clock(), tool="lookup_policy", call_id=f"r{i}"))
-    events.append(ToolResultAdded(ts=clock(), tool="ask_user", call_id="ask"))
+        events.append(
+            ToolResultAdded(ts=clock(), tool="lookup_policy", call_id=f"r{i}", content=LONG)
+        )
+    events.append(ToolResultAdded(ts=clock(), tool="ask_user", call_id="ask", content=LONG))
+    events.append(ToolResultAdded(ts=clock(), tool="record_slot", call_id="short", content="ok"))
     assert fold(events).context.uncompressed_tool_results == 5
 
     compressed_at = clock()

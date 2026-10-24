@@ -1,4 +1,4 @@
-"""Status bar: a pure function of the Case File (DESIGN §8, ADR-0003).
+"""Status bar: a pure function of the Case File and today's date (DESIGN §8, ADR-0003).
 
 Serialised as JSON for the UI and as compact text for the model. Never persisted.
 `current_activity` and `trace_view` are UI-only and added by the API layer.
@@ -6,6 +6,7 @@ Serialised as JSON for the UI and as compact text for the model. Never persisted
 
 from __future__ import annotations
 
+from datetime import date
 from typing import Literal
 
 from pydantic import AwareDatetime, BaseModel
@@ -52,6 +53,7 @@ class ContextMeter(BaseModel):
 
 
 class StatusBar(BaseModel):
+    today: date
     stage: Stage
     active_skills: list[str]
     docs_checklist: list[DocCheck]
@@ -104,11 +106,12 @@ def stage(case: CaseFile) -> Stage:
     return "Done"
 
 
-def render_status(case: CaseFile) -> StatusBar:
+def render_status(case: CaseFile, today: date) -> StatusBar:
     slot_reqs = case.requirements.slots if case.requirements else []
     required = [r.name for r in slot_reqs if r.name not in case.waivers]
     last = case.validation[-1] if case.validation else None
     return StatusBar(
+        today=today,
         stage=stage(case),
         active_skills=list(case.loaded_skills),
         docs_checklist=docs_checklist(case),
@@ -141,7 +144,8 @@ def to_text(bar: StatusBar) -> str:
     changed = " (changed)" if bar.validation.changed_since_last else ""
     ref = f" ref={bar.insurer.ref}" if bar.insurer.ref else ""
     lines = [
-        f"[STATUS] stage={bar.stage} skills={','.join(bar.active_skills) or '-'}",
+        f"[STATUS] today={bar.today.isoformat()} stage={bar.stage}"
+        f" skills={','.join(bar.active_skills) or '-'}",
         f"docs: {docs or '-'}",
         f"slots: {bar.slots.filled}/{bar.slots.total}{low}",
         f"asks: {bar.ask_budget.used}/{bar.ask_budget.max}"

@@ -43,6 +43,7 @@
       'total': 2,
     }),
     'stage': 'Approval',
+    'today': '2026-10-24',
     'validation': dict({
       'changed_since_last': True,
       'verdict': 'pass',
@@ -93,6 +94,7 @@
       'total': 2,
     }),
     'stage': 'Docs',
+    'today': '2026-10-24',
     'validation': dict({
       'changed_since_last': False,
       'verdict': 'none',
@@ -143,6 +145,7 @@
       'total': 2,
     }),
     'stage': 'Done',
+    'today': '2026-10-24',
     'validation': dict({
       'changed_since_last': True,
       'verdict': 'pass',
@@ -193,6 +196,7 @@
       'total': 2,
     }),
     'stage': 'Handover',
+    'today': '2026-10-24',
     'validation': dict({
       'changed_since_last': False,
       'verdict': 'none',
@@ -243,6 +247,7 @@
       'total': 2,
     }),
     'stage': 'Insurer',
+    'today': '2026-10-24',
     'validation': dict({
       'changed_since_last': True,
       'verdict': 'pass',
@@ -276,6 +281,7 @@
       'total': 0,
     }),
     'stage': 'Intake',
+    'today': '2026-10-24',
     'validation': dict({
       'changed_since_last': False,
       'verdict': 'none',
@@ -326,6 +332,7 @@
       'total': 2,
     }),
     'stage': 'Validate',
+    'today': '2026-10-24',
     'validation': dict({
       'changed_since_last': False,
       'verdict': 'none',
@@ -334,7 +341,7 @@
 # ---
 # name: test_render_text_snapshot[approval_pending]
   '''
-  [STATUS] stage=Approval skills=change-of-owner
+  [STATUS] today=2026-10-24 stage=Approval skills=change-of-owner
   docs: rc=accepted; sale_deed=accepted; noc=accepted
   slots: 2/2 low_conf=chassis_no
   asks: 1/3 | validation: pass (changed) | approval: pending | insurer: not_submitted
@@ -343,7 +350,7 @@
 # ---
 # name: test_render_text_snapshot[docs]
   '''
-  [STATUS] stage=Docs skills=change-of-owner
+  [STATUS] today=2026-10-24 stage=Docs skills=change-of-owner
   docs: rc=accepted; sale_deed=rejected (blurry); noc=missing (only if the vehicle is hypothecated)
   slots: 1/2 low_conf=chassis_no
   asks: 0/3 | validation: none | approval: none | insurer: not_submitted
@@ -352,7 +359,7 @@
 # ---
 # name: test_render_text_snapshot[done]
   '''
-  [STATUS] stage=Done skills=change-of-owner
+  [STATUS] today=2026-10-24 stage=Done skills=change-of-owner
   docs: rc=accepted; sale_deed=accepted; noc=accepted
   slots: 2/2 low_conf=chassis_no
   asks: 1/3 | validation: pass (changed) | approval: approved | insurer: issued ref=NWG-END-7781
@@ -361,7 +368,7 @@
 # ---
 # name: test_render_text_snapshot[handover]
   '''
-  [STATUS] stage=Handover skills=change-of-owner
+  [STATUS] today=2026-10-24 stage=Handover skills=change-of-owner
   docs: rc=accepted; sale_deed=rejected (blurry); noc=missing (only if the vehicle is hypothecated)
   slots: 1/2 low_conf=chassis_no
   asks: 0/3 | validation: none | approval: none | insurer: not_submitted
@@ -370,7 +377,7 @@
 # ---
 # name: test_render_text_snapshot[insurer_query]
   '''
-  [STATUS] stage=Insurer skills=change-of-owner
+  [STATUS] today=2026-10-24 stage=Insurer skills=change-of-owner
   docs: rc=accepted; sale_deed=accepted; noc=accepted
   slots: 2/2 low_conf=chassis_no
   asks: 1/3 | validation: pass (changed) | approval: approved | insurer: query_raised ref=NWG-END-7781
@@ -379,7 +386,7 @@
 # ---
 # name: test_render_text_snapshot[new]
   '''
-  [STATUS] stage=Intake skills=-
+  [STATUS] today=2026-10-24 stage=Intake skills=-
   docs: -
   slots: 0/0
   asks: 0/3 | validation: none | approval: none | insurer: not_submitted
@@ -388,7 +395,7 @@
 # ---
 # name: test_render_text_snapshot[validate]
   '''
-  [STATUS] stage=Validate skills=change-of-owner
+  [STATUS] today=2026-10-24 stage=Validate skills=change-of-owner
   docs: rc=accepted; sale_deed=accepted; noc=accepted
   slots: 2/2 low_conf=chassis_no
   asks: 1/3 | validation: none | approval: none | insurer: not_submitted

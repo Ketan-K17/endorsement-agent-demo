@@ -65,13 +65,13 @@ Small and coarse-grained. Every write goes through a validated tool.
 | | `get_endorsement_rules(type, insurer)` | Required docs / fees / TAT from the mock rules master |
 | | `waive_requirement(name, reason)` | Marks a conditional requirement as not applying; refuses unconditional ones (ADR-0014) |
 | Documents | `list_documents()` | Uploaded files + processing status |
-| | `classify_document(doc_id)` | Vision. Doc type + quality verdict |
-| | `extract_fields(doc_id, schema)` | Vision. Values + per-field confidence |
+| | `classify_document(doc_id)` | Vision. Doc type + quality; poor/unreadable docs are rejected (ADR-0015) |
+| | `extract_fields(doc_id, schema)` | Vision. Values + per-field confidence; a clear doc of a required type is accepted |
 | | `cross_check(slot_a, slot_b)` | Name / reg-no / chassis consistency |
-| Skills | `load_skill(name)` | Returns `SKILL.md`; catalog lives in this tool's definition |
-| | `read_skill_file(skill, path)` | Reads a file under that skill's `references/`; sandboxed to the skill directory |
+| Skills | `load_skill(name)` | Result is `loading skill <name>`; `SKILL.md` follows as a user message (ADR-0015); catalog lives in this tool's definition |
+| | `read_skill_file(skill, path)` | Reads a file under that skill's `references/`, sent like `load_skill`; sandboxed to the skill directory |
 | Conversation | `ask_user(questions[], reason)` | Budget gate + log only (ask budget 3). The question text itself is carried by the model's plain reply. The ack result is trivial and excluded from the compression count |
-| Validation | `validate_case()` | Deterministic checks + LLM pass; receives prior verdict and returns a diff (carry-forward) |
+| Validation | `validate_case()` | Deterministic checks (+ LLM pass from step 4); receives prior verdict and returns a diff (carry-forward) |
 | Submission | `request_approval(summary)` | Pauses the graph (`interrupt()`); the user approves in the UI |
 | | `submit_to_insurer(case_id)` | Code-enforced: only if `approval.status == approved`; idempotent |
 | | `check_insurer_status(ref)` | Polls the mock insurer state machine (see below) |
@@ -110,7 +110,7 @@ Uploaded images stay in context only until `classify_document` and `extract_fiel
 Purpose: demonstrate how context compression should work, not primarily to save tokens.
 
 - **Targets only tool results.** User and assistant messages (including the tool calls inside them) are never touched.
-- **Trigger:** when the number of *uncompressed* tool results in the trajectory reaches `COMPRESS_THRESHOLD` (default **5**, configurable). A result that has been compressed is never counted again and never recompressed. Parallel results count individually; `ask_user` acks are excluded.
+- **Trigger:** when the number of *uncompressed* tool results in the trajectory reaches `COMPRESS_THRESHOLD` (default **5**, configurable). A result that has been compressed is never counted again and never recompressed. Parallel results count individually; `ask_user` acks and results under 400 characters (already compact) are excluded. Skill text never enters a tool result (§4).
 - **Action:** compress all uncompressed tool results **except the most recent one** (the latest tool result stays raw). Batch, not per-turn, so the cached prefix changes only at compression events.
 - **Near-lossless:** the compressor (a small model, per-tool prompt) removes wording, boilerplate and repeated structure only. It keeps every identifier, value, confidence, decision and error state. Example stub: `[compressed #r12 extract_fields(doc_3): doc_type=RC; reg_no=KA01AB1234; owner="A. Rao"; chassis=…(conf 0.62); engine=…(conf 0.91); issues=none]`.
 - **No restore tool.** Originals are kept in the event log for audit/replay and evals, not exposed to the model. The Case File remains the source of truth for slot values.
@@ -122,9 +122,9 @@ Ask budget (max asks/case; excess forces summarise-or-handover), tool-call cap p
 
 ## 8. Status bar
 
-Pure function `render_status(case) -> StatusBar`, serialised two ways: compact text appended to the model call (§2) and JSON streamed to the UI over SSE.
+Pure function `render_status(case, today) -> StatusBar`, serialised two ways: compact text appended to the model call (§2) and JSON streamed to the UI over SSE.
 
-Fields: `stage` (computed from state predicates, never stored), `active_skills`, `docs_checklist[{name,state,reason}]`, `slots{filled,total,low_conf[]}`, `ask_budget{used,max}`, `validation{verdict,changed_since_last}`, `approval{status}`, `insurer{stage,ref}`, `context{uncompressed_tool_results,threshold,last_compressed_at}`, `current_activity` (UI only), `trace_view` (UI only; in-app, not a Langfuse link, ADR-0009). The two UI-only fields are added by the API layer, not by `render_status` (ADR-0013).
+Fields: `today` (passed in; dynamic facts belong here, not in the static prefix), `stage` (computed from state predicates, never stored), `active_skills`, `docs_checklist[{name,state,reason}]`, `slots{filled,total,low_conf[]}`, `ask_budget{used,max}`, `validation{verdict,changed_since_last}`, `approval{status}`, `insurer{stage,ref}`, `context{uncompressed_tool_results,threshold,last_compressed_at}`, `current_activity` (UI only), `trace_view` (UI only; in-app, not a Langfuse link, ADR-0009). The two UI-only fields are added by the API layer, not by `render_status` (ADR-0013).
 
 Stages, computed from state in order (never stored):
 Intake (no change request yet) → Docs (required docs not all `accepted`) → Validate (all docs in, no passing verdict) → Approval (verdict passes, no decision) → Insurer (approved, not issued) → Done. Handover applies at any point.

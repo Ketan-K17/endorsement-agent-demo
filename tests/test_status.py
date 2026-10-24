@@ -114,12 +114,12 @@ def test_stage(name: str, clock: Clock) -> None:
 
 @pytest.mark.parametrize("name", EXPECTED_STAGE)
 def test_render_text_snapshot(name: str, clock: Clock, snapshot: SnapshotAssertion) -> None:
-    assert to_text(render_status(_case(name, clock))) == snapshot
+    assert to_text(render_status(_case(name, clock), T0.date())) == snapshot
 
 
 @pytest.mark.parametrize("name", EXPECTED_STAGE)
 def test_render_json_snapshot(name: str, clock: Clock, snapshot: SnapshotAssertion) -> None:
-    assert render_status(_case(name, clock)).model_dump(mode="json") == snapshot
+    assert render_status(_case(name, clock), T0.date()).model_dump(mode="json") == snapshot
 
 
 def test_rules_not_loaded_stays_in_docs(clock: Clock) -> None:
@@ -130,12 +130,12 @@ def test_rules_not_loaded_stays_in_docs(clock: Clock) -> None:
 def test_rejection_keeps_approval_stage(clock: Clock) -> None:
     events = [*_approved(clock)[:-1], ApprovalDecided(ts=clock(), status="rejected", reason="x")]
     case = fold(events)
-    assert (stage(case), render_status(case).approval) == ("Approval", "rejected")
+    assert (stage(case), render_status(case, T0.date()).approval) == ("Approval", "rejected")
 
 
 def test_render_is_deterministic(clock: Clock) -> None:
     case = _case("insurer_query", clock)
-    assert render_status(case) == render_status(case)
+    assert render_status(case, T0.date()) == render_status(case, T0.date())
 
 
 def test_waived_requirement_counts_as_satisfied(clock: Clock) -> None:
@@ -144,7 +144,7 @@ def test_waived_requirement_counts_as_satisfied(clock: Clock) -> None:
         RequirementWaived(ts=clock(), name="noc", reason="policy shows no financier"),
     ]
     case = fold(events)
-    noc = next(c for c in render_status(case).docs_checklist if c.name == "noc")
+    noc = next(c for c in render_status(case, T0.date()).docs_checklist if c.name == "noc")
     assert (noc.state, noc.reason) == ("waived", "policy shows no financier")
     assert stage(case) == "Validate"
 
@@ -154,4 +154,4 @@ def test_waived_slot_leaves_total(clock: Clock) -> None:
         *owner_transfer_events(clock),
         RequirementWaived(ts=clock(), name="new_owner_name", reason="test"),
     ]
-    assert render_status(fold(events)).slots.total == 1
+    assert render_status(fold(events), T0.date()).slots.total == 1

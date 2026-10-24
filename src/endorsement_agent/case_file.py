@@ -12,7 +12,6 @@ from typing import Any, Literal
 from pydantic import AwareDatetime, BaseModel, Field
 
 from endorsement_agent.events import (
-    ASK_USER_TOOL,
     ApprovalDecided,
     ApprovalRequested,
     AskLogged,
@@ -26,6 +25,8 @@ from endorsement_agent.events import (
     DocumentUploaded,
     ExtractedField,
     HandoverRaised,
+    ImageStubbed,
+    InsurerResponded,
     InsurerSubmitted,
     InsurerUpdated,
     PolicySelected,
@@ -37,6 +38,7 @@ from endorsement_agent.events import (
     SlotRecorded,
     ToolResultAdded,
     ValidationCompleted,
+    compressible,
 )
 
 
@@ -183,12 +185,14 @@ def apply(case: CaseFile, event: CaseEvent) -> CaseFile:
             c.insurer.stage, c.insurer.last_message = stage, message
         case HandoverRaised(team=team, reason=reason, severity=severity):
             c.handover = Handover(team=team, reason=reason, severity=severity)
-        case ToolResultAdded(tool=tool):
-            if tool != ASK_USER_TOOL:
+        case ToolResultAdded(tool=tool, content=content):
+            if compressible(tool, content):
                 c.context.uncompressed_tool_results += 1
         case ContextCompressed(call_ids=call_ids):
             c.context.uncompressed_tool_results -= len(call_ids)
             c.context.last_compressed_at = event.ts
+        case InsurerResponded() | ImageStubbed():
+            pass  # audit only: the insurer stage moves on the next status check
     return c
 
 

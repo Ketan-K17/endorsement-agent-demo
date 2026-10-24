@@ -35,9 +35,9 @@ Portfolio demo of an agentic insurance-endorsement assistant. Performative, not 
 ## Key design invariants (do not break)
 
 1. Prompt order: system prompt (role + guidelines + full SOP) → tool definitions → full history → status bar last (as a final `user` message, not stored).
-2. Status bar is a pure function of the Case File, built per model call, **never persisted** in history or checkpoints.
+2. Status bar is a pure function of the Case File (and today's date), built per model call, **never persisted** in history or checkpoints.
 3. History is never truncated; only image stubbing and tool-result compression transform it, both recorded in the event log with originals kept.
-4. Compression: trigger at 5 uncompressed tool results, compress all but the most recent, never recount or recompress, parallel results count individually, `ask_user` acks excluded.
+4. Compression: trigger at 5 uncompressed tool results, compress all but the most recent, never recount or recompress, parallel results count individually, `ask_user` acks and results under 400 chars excluded. Skill text is a user message, never a tool result.
 5. Slots are written only through `record_slot`. `submit_to_insurer` is code-enforced to require an approved approval.
 6. A turn ends on a plain assistant message with no tool call. There is no `send_reply`.
 7. Case File is event-sourced; one event stream feeds UI, replay, traces and evals.
@@ -55,8 +55,8 @@ Update this block when a step finishes.
 - [x] Design, glossary, ADRs 0001–0012, fixture folders
 - [x] 1. Case File, event store, `render_status` + snapshot tests (ADR-0013)
 - [x] 2. Mock world: policies, rules master, insurer state machine (ADR-0014)
-- [ ] 3. Tools + LangGraph loop + status bar + image stubbing + compression  ← next
-- [ ] 4. Extraction against fixture documents (needs tweaked docs from the user)
+- [x] 3. Tools + LangGraph loop + status bar + image stubbing + compression (ADR-0015; live smoke run `python -m endorsement_agent` pending `.env`)
+- [ ] 4. Extraction against fixture documents (needs tweaked docs from the user)  ← next
 - [ ] 5. API + SSE + UI
 - [ ] 6. Evals + nightly runs
 - [ ] 7. Deploy to Hugging Face Spaces with limits (needs credentials sign-off)
@@ -64,5 +64,5 @@ Update this block when a step finishes.
 ## Waiting on the user
 
 - Tweaked documents per `fixtures/documents/README.md` (start with cases 01, 03, 05), matching the drafted `personas.yaml`. Needed at step 4.
-- Personal Langfuse project credentials (needed from step 3).
+- Personal Langfuse project credentials (tracing is optional until then).
 - `.env` with Azure credentials for the roles above.

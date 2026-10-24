@@ -1,7 +1,7 @@
 """Case events: the single append-only stream behind the Case File (ADR-0008).
 
-Only events that change the Case File live here. Loop, model and UI events are added with
-the steps that emit them.
+Case File events plus the history transforms (image stubbing, compression), which the
+Context tab and evals replay. Model and UI events are added with the steps that emit them.
 """
 
 from __future__ import annotations
@@ -12,6 +12,13 @@ from typing import Annotated, Any, Literal
 from pydantic import AwareDatetime, BaseModel, Field, TypeAdapter
 
 ASK_USER_TOOL = "ask_user"
+# A tool result shorter than this is left as is: a stub would be no shorter (ADR-0015).
+COMPRESS_MIN_CHARS = 400
+
+
+def compressible(tool: str, content: str) -> bool:
+    """Counts toward the compression trigger and can be compressed."""
+    return tool != ASK_USER_TOOL and len(content) >= COMPRESS_MIN_CHARS
 
 
 def _now() -> datetime:
@@ -158,6 +165,14 @@ class InsurerUpdated(_Event):
     message: str | None = None
 
 
+class InsurerResponded(_Event):
+    """An answer sent to an open insurer query (ADR-0014). Kept for eval assertions."""
+
+    type: Literal["insurer.responded"] = "insurer.responded"
+    message: str
+    doc_ids: list[str] = Field(default_factory=list)
+
+
 class HandoverRaised(_Event):
     type: Literal["handover.raised"] = "handover.raised"
     team: str
@@ -171,6 +186,8 @@ class ToolResultAdded(_Event):
     type: Literal["tool.result"] = "tool.result"
     tool: str
     call_id: str
+    content: str = ""  # the original result, kept after compression (DESIGN §6)
+    attachment: str | None = None  # skill text sent as a user message after the results
 
 
 class ContextCompressed(_Event):
@@ -178,6 +195,14 @@ class ContextCompressed(_Event):
     call_ids: list[str]
     tokens_before: int
     tokens_after: int
+    stubs: dict[str, str] = Field(default_factory=dict)  # call_id -> stub that replaced it
+
+
+class ImageStubbed(_Event):
+    """An upload's image part was replaced by a text stub after extraction (DESIGN §6.1)."""
+
+    type: Literal["history.image_stubbed"] = "history.image_stubbed"
+    doc_id: str
 
 
 CaseEvent = Annotated[
@@ -198,9 +223,11 @@ CaseEvent = Annotated[
     | ApprovalDecided
     | InsurerSubmitted
     | InsurerUpdated
+    | InsurerResponded
     | HandoverRaised
     | ToolResultAdded
-    | ContextCompressed,
+    | ContextCompressed
+    | ImageStubbed,
     Field(discriminator="type"),
 ]
 
