@@ -36,10 +36,12 @@ Event-sourced: an append-only event list; state is a fold over it. Enables repla
 
 ```
 CaseFile
-  case_id, created_at
+  case_id, created_at, ask_budget
   policy: PolicySnapshot | None
   change_request: {type, details} | None          # one per case in v1; schema is list-ready
-  slots: {name -> Slot{value, source, confidence, superseded_by?}}
+  requirements: {docs[{name, condition?}], slots[{name, condition?}]} | None   # from rules.loaded (ADR-0013)
+  waivers: {requirement name -> reason}                                       # from requirement.waived (ADR-0014)
+  slots: {name -> Slot{value, source, confidence, supersede_reason?}}          # current value; history in event log
   documents: [Doc{id, filename, type, quality, extraction, verdict}]
   validation: [Verdict{ts, outcome, issues[], diff_vs_prev}]
   asks: [Ask{ts, questions[], reason}]            # ask log
@@ -47,6 +49,7 @@ CaseFile
   insurer: {ref?, stage, last_message?}
   loaded_skills: [name]
   handover: {team, reason, severity} | None
+  context: {uncompressed_tool_results, threshold, last_compressed_at}   # from tool.result / context.compressed
 ```
 
 ## 4. Tools
@@ -60,6 +63,7 @@ Small and coarse-grained. Every write goes through a validated tool.
 | | `record_change_request(type, details)` | Sets the case's endorsement type |
 | Policy | `lookup_policy(policy_no \| reg_no \| phone)` | Mock policy store; may return several matches |
 | | `get_endorsement_rules(type, insurer)` | Required docs / fees / TAT from the mock rules master |
+| | `waive_requirement(name, reason)` | Marks a conditional requirement as not applying; refuses unconditional ones (ADR-0014) |
 | Documents | `list_documents()` | Uploaded files + processing status |
 | | `classify_document(doc_id)` | Vision. Doc type + quality verdict |
 | | `extract_fields(doc_id, schema)` | Vision. Values + per-field confidence |
@@ -71,11 +75,12 @@ Small and coarse-grained. Every write goes through a validated tool.
 | Submission | `request_approval(summary)` | Pauses the graph (`interrupt()`); the user approves in the UI |
 | | `submit_to_insurer(case_id)` | Code-enforced: only if `approval.status == approved`; idempotent |
 | | `check_insurer_status(ref)` | Polls the mock insurer state machine (see below) |
+| | `respond_to_insurer(ref, message, doc_ids?)` | Answers an open insurer query; the state machine holds until then (ADR-0014) |
 | Escalation | `handover(team, reason, severity)` | Ends autonomous handling with a structured note |
 
 A turn ends when the model emits a plain assistant message with no tool call; that message is the reply (there is no `send_reply` tool, ADR-0010). Parallel tool calls are allowed (§15).
 
-`check_insurer_status`: after submission the insurer responds asynchronously. The mock is a scripted state machine per scenario, e.g. `received → query_raised("seller NOC unclear") → approved → issued`. An insurer query must be turned into a user ask. Drives the last stages of the status bar.
+`check_insurer_status`: after submission the insurer responds asynchronously. The mock is a scripted state machine per scenario, e.g. `received → query_raised("seller NOC unclear") → approved → issued`. An insurer query must be turned into a user ask, and the answer sent back with `respond_to_insurer`; the machine waits at the query until then. Drives the last stages of the status bar.
 
 ## 5. Skills
 
@@ -119,7 +124,7 @@ Ask budget (max asks/case; excess forces summarise-or-handover), tool-call cap p
 
 Pure function `render_status(case) -> StatusBar`, serialised two ways: compact text appended to the model call (§2) and JSON streamed to the UI over SSE.
 
-Fields: `stage` (computed from state predicates, never stored), `active_skills`, `docs_checklist[{name,state,reason}]`, `slots{filled,total,low_conf[]}`, `ask_budget{used,max}`, `validation{verdict,changed_since_last}`, `approval{status}`, `insurer{stage,ref}`, `context{uncompressed_tool_results,threshold,last_compressed_at}`, `current_activity` (UI only), `trace_view` (UI only; in-app, not a Langfuse link, ADR-0009).
+Fields: `stage` (computed from state predicates, never stored), `active_skills`, `docs_checklist[{name,state,reason}]`, `slots{filled,total,low_conf[]}`, `ask_budget{used,max}`, `validation{verdict,changed_since_last}`, `approval{status}`, `insurer{stage,ref}`, `context{uncompressed_tool_results,threshold,last_compressed_at}`, `current_activity` (UI only), `trace_view` (UI only; in-app, not a Langfuse link, ADR-0009). The two UI-only fields are added by the API layer, not by `render_status` (ADR-0013).
 
 Stages, computed from state in order (never stored):
 Intake (no change request yet) → Docs (required docs not all `accepted`) → Validate (all docs in, no passing verdict) → Approval (verdict passes, no decision) → Insurer (approved, not issued) → Done. Handover applies at any point.

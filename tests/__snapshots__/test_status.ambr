@@ -1,0 +1,397 @@
+# serializer version: 1
+# name: test_render_json_snapshot[approval_pending]
+  dict({
+    'active_skills': list([
+      'change-of-owner',
+    ]),
+    'approval': 'pending',
+    'ask_budget': dict({
+      'max': 3,
+      'used': 1,
+    }),
+    'context': dict({
+      'last_compressed_at': None,
+      'threshold': 5,
+      'uncompressed_tool_results': 0,
+    }),
+    'docs_checklist': list([
+      dict({
+        'name': 'rc',
+        'reason': None,
+        'state': 'accepted',
+      }),
+      dict({
+        'name': 'sale_deed',
+        'reason': None,
+        'state': 'accepted',
+      }),
+      dict({
+        'name': 'noc',
+        'reason': None,
+        'state': 'accepted',
+      }),
+    ]),
+    'insurer': dict({
+      'ref': None,
+      'stage': 'not_submitted',
+    }),
+    'slots': dict({
+      'filled': 2,
+      'low_conf': list([
+        'chassis_no',
+      ]),
+      'total': 2,
+    }),
+    'stage': 'Approval',
+    'validation': dict({
+      'changed_since_last': True,
+      'verdict': 'pass',
+    }),
+  })
+# ---
+# name: test_render_json_snapshot[docs]
+  dict({
+    'active_skills': list([
+      'change-of-owner',
+    ]),
+    'approval': 'none',
+    'ask_budget': dict({
+      'max': 3,
+      'used': 0,
+    }),
+    'context': dict({
+      'last_compressed_at': None,
+      'threshold': 5,
+      'uncompressed_tool_results': 0,
+    }),
+    'docs_checklist': list([
+      dict({
+        'name': 'rc',
+        'reason': None,
+        'state': 'accepted',
+      }),
+      dict({
+        'name': 'sale_deed',
+        'reason': 'blurry',
+        'state': 'rejected',
+      }),
+      dict({
+        'name': 'noc',
+        'reason': 'only if the vehicle is hypothecated',
+        'state': 'missing',
+      }),
+    ]),
+    'insurer': dict({
+      'ref': None,
+      'stage': 'not_submitted',
+    }),
+    'slots': dict({
+      'filled': 1,
+      'low_conf': list([
+        'chassis_no',
+      ]),
+      'total': 2,
+    }),
+    'stage': 'Docs',
+    'validation': dict({
+      'changed_since_last': False,
+      'verdict': 'none',
+    }),
+  })
+# ---
+# name: test_render_json_snapshot[done]
+  dict({
+    'active_skills': list([
+      'change-of-owner',
+    ]),
+    'approval': 'approved',
+    'ask_budget': dict({
+      'max': 3,
+      'used': 1,
+    }),
+    'context': dict({
+      'last_compressed_at': None,
+      'threshold': 5,
+      'uncompressed_tool_results': 0,
+    }),
+    'docs_checklist': list([
+      dict({
+        'name': 'rc',
+        'reason': None,
+        'state': 'accepted',
+      }),
+      dict({
+        'name': 'sale_deed',
+        'reason': None,
+        'state': 'accepted',
+      }),
+      dict({
+        'name': 'noc',
+        'reason': None,
+        'state': 'accepted',
+      }),
+    ]),
+    'insurer': dict({
+      'ref': 'NWG-END-7781',
+      'stage': 'issued',
+    }),
+    'slots': dict({
+      'filled': 2,
+      'low_conf': list([
+        'chassis_no',
+      ]),
+      'total': 2,
+    }),
+    'stage': 'Done',
+    'validation': dict({
+      'changed_since_last': True,
+      'verdict': 'pass',
+    }),
+  })
+# ---
+# name: test_render_json_snapshot[handover]
+  dict({
+    'active_skills': list([
+      'change-of-owner',
+    ]),
+    'approval': 'none',
+    'ask_budget': dict({
+      'max': 3,
+      'used': 0,
+    }),
+    'context': dict({
+      'last_compressed_at': None,
+      'threshold': 5,
+      'uncompressed_tool_results': 0,
+    }),
+    'docs_checklist': list([
+      dict({
+        'name': 'rc',
+        'reason': None,
+        'state': 'accepted',
+      }),
+      dict({
+        'name': 'sale_deed',
+        'reason': 'blurry',
+        'state': 'rejected',
+      }),
+      dict({
+        'name': 'noc',
+        'reason': 'only if the vehicle is hypothecated',
+        'state': 'missing',
+      }),
+    ]),
+    'insurer': dict({
+      'ref': None,
+      'stage': 'not_submitted',
+    }),
+    'slots': dict({
+      'filled': 1,
+      'low_conf': list([
+        'chassis_no',
+      ]),
+      'total': 2,
+    }),
+    'stage': 'Handover',
+    'validation': dict({
+      'changed_since_last': False,
+      'verdict': 'none',
+    }),
+  })
+# ---
+# name: test_render_json_snapshot[insurer_query]
+  dict({
+    'active_skills': list([
+      'change-of-owner',
+    ]),
+    'approval': 'approved',
+    'ask_budget': dict({
+      'max': 3,
+      'used': 1,
+    }),
+    'context': dict({
+      'last_compressed_at': None,
+      'threshold': 5,
+      'uncompressed_tool_results': 0,
+    }),
+    'docs_checklist': list([
+      dict({
+        'name': 'rc',
+        'reason': None,
+        'state': 'accepted',
+      }),
+      dict({
+        'name': 'sale_deed',
+        'reason': None,
+        'state': 'accepted',
+      }),
+      dict({
+        'name': 'noc',
+        'reason': None,
+        'state': 'accepted',
+      }),
+    ]),
+    'insurer': dict({
+      'ref': 'NWG-END-7781',
+      'stage': 'query_raised',
+    }),
+    'slots': dict({
+      'filled': 2,
+      'low_conf': list([
+        'chassis_no',
+      ]),
+      'total': 2,
+    }),
+    'stage': 'Insurer',
+    'validation': dict({
+      'changed_since_last': True,
+      'verdict': 'pass',
+    }),
+  })
+# ---
+# name: test_render_json_snapshot[new]
+  dict({
+    'active_skills': list([
+    ]),
+    'approval': 'none',
+    'ask_budget': dict({
+      'max': 3,
+      'used': 0,
+    }),
+    'context': dict({
+      'last_compressed_at': None,
+      'threshold': 5,
+      'uncompressed_tool_results': 0,
+    }),
+    'docs_checklist': list([
+    ]),
+    'insurer': dict({
+      'ref': None,
+      'stage': 'not_submitted',
+    }),
+    'slots': dict({
+      'filled': 0,
+      'low_conf': list([
+      ]),
+      'total': 0,
+    }),
+    'stage': 'Intake',
+    'validation': dict({
+      'changed_since_last': False,
+      'verdict': 'none',
+    }),
+  })
+# ---
+# name: test_render_json_snapshot[validate]
+  dict({
+    'active_skills': list([
+      'change-of-owner',
+    ]),
+    'approval': 'none',
+    'ask_budget': dict({
+      'max': 3,
+      'used': 1,
+    }),
+    'context': dict({
+      'last_compressed_at': None,
+      'threshold': 5,
+      'uncompressed_tool_results': 0,
+    }),
+    'docs_checklist': list([
+      dict({
+        'name': 'rc',
+        'reason': None,
+        'state': 'accepted',
+      }),
+      dict({
+        'name': 'sale_deed',
+        'reason': None,
+        'state': 'accepted',
+      }),
+      dict({
+        'name': 'noc',
+        'reason': None,
+        'state': 'accepted',
+      }),
+    ]),
+    'insurer': dict({
+      'ref': None,
+      'stage': 'not_submitted',
+    }),
+    'slots': dict({
+      'filled': 2,
+      'low_conf': list([
+        'chassis_no',
+      ]),
+      'total': 2,
+    }),
+    'stage': 'Validate',
+    'validation': dict({
+      'changed_since_last': False,
+      'verdict': 'none',
+    }),
+  })
+# ---
+# name: test_render_text_snapshot[approval_pending]
+  '''
+  [STATUS] stage=Approval skills=change-of-owner
+  docs: rc=accepted; sale_deed=accepted; noc=accepted
+  slots: 2/2 low_conf=chassis_no
+  asks: 1/3 | validation: pass (changed) | approval: pending | insurer: not_submitted
+  context: 0/5 uncompressed tool results
+  '''
+# ---
+# name: test_render_text_snapshot[docs]
+  '''
+  [STATUS] stage=Docs skills=change-of-owner
+  docs: rc=accepted; sale_deed=rejected (blurry); noc=missing (only if the vehicle is hypothecated)
+  slots: 1/2 low_conf=chassis_no
+  asks: 0/3 | validation: none | approval: none | insurer: not_submitted
+  context: 0/5 uncompressed tool results
+  '''
+# ---
+# name: test_render_text_snapshot[done]
+  '''
+  [STATUS] stage=Done skills=change-of-owner
+  docs: rc=accepted; sale_deed=accepted; noc=accepted
+  slots: 2/2 low_conf=chassis_no
+  asks: 1/3 | validation: pass (changed) | approval: approved | insurer: issued ref=NWG-END-7781
+  context: 0/5 uncompressed tool results
+  '''
+# ---
+# name: test_render_text_snapshot[handover]
+  '''
+  [STATUS] stage=Handover skills=change-of-owner
+  docs: rc=accepted; sale_deed=rejected (blurry); noc=missing (only if the vehicle is hypothecated)
+  slots: 1/2 low_conf=chassis_no
+  asks: 0/3 | validation: none | approval: none | insurer: not_submitted
+  context: 0/5 uncompressed tool results
+  '''
+# ---
+# name: test_render_text_snapshot[insurer_query]
+  '''
+  [STATUS] stage=Insurer skills=change-of-owner
+  docs: rc=accepted; sale_deed=accepted; noc=accepted
+  slots: 2/2 low_conf=chassis_no
+  asks: 1/3 | validation: pass (changed) | approval: approved | insurer: query_raised ref=NWG-END-7781
+  context: 0/5 uncompressed tool results
+  '''
+# ---
+# name: test_render_text_snapshot[new]
+  '''
+  [STATUS] stage=Intake skills=-
+  docs: -
+  slots: 0/0
+  asks: 0/3 | validation: none | approval: none | insurer: not_submitted
+  context: 0/5 uncompressed tool results
+  '''
+# ---
+# name: test_render_text_snapshot[validate]
+  '''
+  [STATUS] stage=Validate skills=change-of-owner
+  docs: rc=accepted; sale_deed=accepted; noc=accepted
+  slots: 2/2 low_conf=chassis_no
+  asks: 1/3 | validation: none | approval: none | insurer: not_submitted
+  context: 0/5 uncompressed tool results
+  '''
+# ---

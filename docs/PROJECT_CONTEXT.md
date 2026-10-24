@@ -24,6 +24,8 @@ A change to an existing motor policy: change of owner, nominee update, name corr
 - One event stream for UI, replay, traces and evals (0008). In-app trace view; Langfuse private (0009).
 - Plain assistant message ends a turn; no `send_reply` (0010).
 - Usage caps and credentials (0011). Scope and build order (0012).
+- Requirements and context meter are Case File state, folded from events (0013).
+- Conditional requirements are waived by tool; insurer queries are answered by tool (0014).
 
 ## What the owner said that isn't obvious from the design
 
