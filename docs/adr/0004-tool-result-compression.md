@@ -5,7 +5,7 @@ Status: accepted
 **Context.** Full history is kept (no truncation). Tool results (extractions, policy lookups, rule dumps) are the bulkiest, lowest-reuse content. The goal is a visible, correct PoC of context compression, not token savings.
 
 **Decision.**
-- Compress only tool results; never user/assistant messages or tool calls.
+- Compress only tool results; never user/assistant messages (which include the tool calls).
 - Trigger when uncompressed tool results reach 5 (configurable). Compress all of them except the most recent. Already-compressed results are not counted again and not recompressed.
 - Compressor = small model with per-tool prompts; near-lossless: drop wording and boilerplate, keep every identifier, value, confidence, decision and error state.
 - Originals stay in the event log for audit and evals. There is no tool for the model to restore them (rejected as unnecessary complexity).

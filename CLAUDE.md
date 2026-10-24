@@ -34,7 +34,7 @@ Portfolio demo of an agentic insurance-endorsement assistant. Performative, not 
 
 ## Key design invariants (do not break)
 
-1. Prompt order: system prompt (role + guidelines + full SOP) → tool definitions → full history → status bar last.
+1. Prompt order: system prompt (role + guidelines + full SOP) → tool definitions → full history → status bar last (as a final `user` message, not stored).
 2. Status bar is a pure function of the Case File, built per model call, **never persisted** in history or checkpoints.
 3. History is never truncated; only image stubbing and tool-result compression transform it, both recorded in the event log with originals kept.
 4. Compression: trigger at 5 uncompressed tool results, compress all but the most recent, never recount or recompress, parallel results count individually, `ask_user` acks excluded.

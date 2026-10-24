@@ -4,3 +4,4 @@ private_docs/
 __pycache__/
 *.pyc
 node_modules/
+.sentry*

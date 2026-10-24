@@ -20,7 +20,7 @@
 
 **Static prefix** — system prompt + tool definitions. Identical on every call; cacheable.
 
-**Trajectory** — static prefix + chat history (user/assistant/tool-call/tool-result messages) + status bar.
+**Trajectory** — static prefix + chat history (user/assistant/tool messages; tool calls are part of assistant messages) + status bar.
 
 **Skill** — a folder (`SKILL.md` + optional `references/`) bundling the workflow knowledge for one endorsement type or cross-cutting behaviour; loaded on demand.
 
@@ -28,7 +28,7 @@
 
 **Reference file** — specialised document inside a skill's `references/`, fetched with `read_skill_file`.
 
-**Status bar** — ephemeral rendering of the Case File appended as the last block of each model call and streamed to the UI; never stored in history.
+**Status bar** — ephemeral rendering of the Case File appended as the final `user` message of each model call (for now) and streamed to the UI; never stored in history.
 
 **Stage** — Intake → Docs → Validate → Approval → Insurer → Done (or Handover); computed from state, never stored.
 

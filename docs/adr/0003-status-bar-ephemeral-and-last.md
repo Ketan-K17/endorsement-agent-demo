@@ -2,7 +2,7 @@
 
 Status: accepted
 
-**Decision.** `render_status(case)` is rendered on every model call and appended after the chat history. It is never written to stored history or the checkpointer. The same function feeds the UI over SSE.
+**Decision.** `render_status(case)` is rendered on every model call and appended after the chat history as a final `user` message (for now, to stay within the four message roles). The injected message is dropped after the call. It is never written to stored history or the checkpointer. The same function feeds the UI over SSE.
 
 **Why.** Guarantees the model never sees stale copies; keeps the bar a pure function of the Case File (not LLM-generated); keeps everything above it append-only so the prefix cache stays warm.
 

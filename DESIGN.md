@@ -19,13 +19,14 @@ A portfolio demo of an agentic (non-deterministic) insurance-endorsement assista
 │ system prompt   = role + basic guidelines + full SOP           │
 │ tool definitions (incl. load_skill with the skill catalog)     │
 ├ TRAJECTORY (append-only except §6 transforms) ─────────────────┤
-│ user / assistant / tool-call / tool-result messages, entire    │
+│ user / assistant / tool messages, entire                        │
 ├ STATUS BAR (ephemeral, regenerated every model call) ──────────┤
-│ rendered from the Case File, always the final block            │
+│ rendered from the Case File, sent as the final user message    │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
-- The status bar is built per call and **never persisted** to history or the checkpointer, so stale copies cannot exist.
+- Four roles only: `system`, `user`, `assistant`, `tool`. History is stored in LangChain's message format, so it is forced into a compatible shape. A tool call is not a separate message: an `assistant` message has two fields, `content` and `tool_calls`. When the agent calls tools, `content` is empty and `tool_calls` is non-empty; when it replies in text, `content` is filled and `tool_calls` is empty. Each call's output comes back as a `tool` message (LangChain `ToolMessage`).
+- The status bar is appended as a final `user` message (for now) so it fits the four-role format. It is built per call and **never persisted** to history or the checkpointer, so stale copies cannot exist.
 - Because everything above the bar only grows (or changes at compression events), the provider-side prefix cache stays warm.
 - **Skill catalog placement:** inside the `load_skill` tool definition (an enum of skill names plus a one-line "use when…" per skill, generated from `SKILL.md` frontmatter at startup). It is part of the static prefix, sits next to the tool that uses it, and keeps the system prompt to SOP and guidelines. See ADR-0002.
 
@@ -103,9 +104,9 @@ Uploaded images stay in context only until `classify_document` and `extract_fiel
 ### 6.2 Tool-result compression (proof of concept)
 Purpose: demonstrate how context compression should work, not primarily to save tokens.
 
-- **Targets only tool results.** User/assistant messages and tool calls are never touched.
+- **Targets only tool results.** User and assistant messages (including the tool calls inside them) are never touched.
 - **Trigger:** when the number of *uncompressed* tool results in the trajectory reaches `COMPRESS_THRESHOLD` (default **5**, configurable). A result that has been compressed is never counted again and never recompressed. Parallel results count individually; `ask_user` acks are excluded.
-- **Action:** compress all uncompressed tool results **except the most recent one** (the latest tool call stays raw). Batch, not per-turn, so the cached prefix changes only at compression events.
+- **Action:** compress all uncompressed tool results **except the most recent one** (the latest tool result stays raw). Batch, not per-turn, so the cached prefix changes only at compression events.
 - **Near-lossless:** the compressor (a small model, per-tool prompt) removes wording, boilerplate and repeated structure only. It keeps every identifier, value, confidence, decision and error state. Example stub: `[compressed #r12 extract_fields(doc_3): doc_type=RC; reg_no=KA01AB1234; owner="A. Rao"; chassis=…(conf 0.62); engine=…(conf 0.91); issues=none]`.
 - **No restore tool.** Originals are kept in the event log for audit/replay and evals, not exposed to the model. The Case File remains the source of truth for slot values.
 - **Visible:** each compression emits a `context.compressed` event → trace span, UI timeline chip (`compressed 4 results, 4.1k → 1.2k tokens`), and a status-bar context meter.

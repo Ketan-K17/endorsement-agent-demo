@@ -33,7 +33,7 @@ A change to an existing motor policy: change of owner, nominee update, name corr
 - Show the Context tab: green for what is still in the prompt, red for what has left it. Low priority; a static page is acceptable.
 - Reduce latency as much as possible (parallel tool calls, streaming activity).
 - One endorsement per case now; multi-change support later (the schema is list-ready).
-- Multi-change later means shared documents are asked once and conflicting skill rules reconciled.
+- Multi-change later: a document required by more than one endorsement in a case is requested once, and conflicting rules between loaded skills must be reconciled.
 
 ## Real-world failure modes worth reproducing as eval scenarios
 
