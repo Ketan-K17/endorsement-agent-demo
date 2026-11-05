@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+from datetime import date
 from typing import Any
 
 import pytest
@@ -33,6 +34,13 @@ def agent(rt: Runtime, script: list[AIMessage], **limits: int) -> tuple[Agent, S
     model = ScriptedModel(script=script)
     graph = build_graph(rt, model, no_compress, Limits(**limits))
     return Agent(rt, graph, callbacks=[]), model
+
+
+async def test_a_fixed_today_reaches_the_status_bar(rt: Runtime) -> None:
+    rt.fixed_today = date(2026, 10, 15)
+    a, model = agent(rt, [AIMessage(content="Hello!")])
+    await a.send("hi")
+    assert str(model.prompts[0][-1].content).startswith("[STATUS] today=2026-10-15 ")
 
 
 async def test_plain_reply_ends_turn_and_bar_is_last_not_stored(rt: Runtime) -> None:

@@ -44,7 +44,7 @@ Portfolio demo of an agentic insurance-endorsement assistant. Performative, not 
 
 ## Environment variables
 
-Names only; values in `.env` (see `.env.example`). Per role `<ROLE>` ∈ `AGENT`, `EXTRACTOR`, `COMPRESSOR`, `JUDGE`: `<ROLE>_ENDPOINT`, `<ROLE>_API_KEY`, `<ROLE>_DEPLOYMENT`, `<ROLE>_API_VERSION`. Plus `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY`, `LANGFUSE_HOST`, `COMPRESS_THRESHOLD`, `ASK_BUDGET`, `MAX_TOOL_CALLS_PER_TURN`, `SESSION_MAX_MODEL_CALLS`, `SESSION_MAX_TOKENS`, `IP_MAX_SESSIONS_PER_DAY`, `DAILY_BUDGET_SWITCH`, `INVITE_CODE`.
+Names only; values in `.env` (see `.env.example`). Per role `<ROLE>` ∈ `AGENT`, `EXTRACTOR`, `COMPRESSOR`, `JUDGE`: `<ROLE>_ENDPOINT`, `<ROLE>_API_KEY`, `<ROLE>_DEPLOYMENT`, `<ROLE>_API_VERSION`. Plus `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY`, `LANGFUSE_HOST`, `COMPRESS_THRESHOLD`, `ASK_BUDGET`, `MAX_TOOL_CALLS_PER_TURN`, `SESSION_MAX_MODEL_CALLS`, `SESSION_MAX_TOKENS`, `IP_MAX_SESSIONS_PER_DAY`, `DAILY_BUDGET_SWITCH`, `INVITE_CODE`, `FIXED_TODAY` (optional).
 
 Model assignment (ADR-0007): agent `gpt-5.6-sol` (India resource); extractor `gpt-5.4-mini`, compressor `gpt-5.4-nano`, judge `gpt-5` (US resource). Check availability and capabilities with `tools/probe_models.py`.
 
@@ -55,9 +55,9 @@ Update this block when a step finishes.
 - [x] Design, glossary, ADRs 0001–0012, fixture folders
 - [x] 1. Case File, event store, `render_status` + snapshot tests (ADR-0013)
 - [x] 2. Mock world: policies, rules master, insurer state machine (ADR-0014)
-- [x] 3. Tools + LangGraph loop + status bar + image stubbing + compression (ADR-0015; live smoke run `python -m endorsement_agent` pending `.env`)
-- [ ] 4. Extraction against fixture documents (cases 01, 03, 05 built, ADR-0016)  ← next
-- [ ] 5. API + SSE + UI
+- [x] 3. Tools + LangGraph loop + status bar + image stubbing + compression (ADR-0015; live smoke run `python -m endorsement_agent` passed on case 01)
+- [x] 4. Extraction against fixture documents (cases 01, 03, 05; ADR-0016) + `validate_case` LLM pass (ADR-0017). Check with `tools/extract_fixtures.py`
+- [ ] 5. API + SSE + UI  ← next
 - [ ] 6. Evals + nightly runs
 - [ ] 7. Deploy to Hugging Face Spaces with limits (needs credentials sign-off)
 
@@ -65,4 +65,3 @@ Update this block when a step finishes.
 
 - Templates for cases 02, 04, 06 (later).
 - Personal Langfuse project credentials (tracing is optional until then).
-- `.env` with Azure credentials for the roles above.

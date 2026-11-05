@@ -6,7 +6,7 @@ Status: accepted (doc verdicts, validation scope, skill messages, short results 
 
 **Decision.**
 - **Document verdicts are set by code.** `classify_document` rejects a `poor` or `unreadable` doc with the reason. `extract_fields` accepts a clear doc whose type is a required doc. Other types get no verdict. No `review_document` tool.
-- **`validate_case` is deterministic for now:** policy selected and active, change request and rules present, docs accepted or waived, required slots filled, no slot below 0.7, document `policy_no`/`reg_no` equal to the policy's. Issues come out in a fixed order; `diff_vs_prev` lists `+`/`-` lines. The LLM pass is added in step 4, once real extractions exist.
+- **`validate_case` is deterministic for now:** policy selected and active, change request and rules present, docs accepted or waived, required slots filled, no slot below 0.7, document `policy_no`/`reg_no` equal to the policy's. Issues come out in a fixed order; `diff_vs_prev` lists `+`/`-` lines. The LLM pass is added in step 4, once real extractions exist (ADR-0017).
 - **`request_approval` needs a current verdict:** the latest validation passed and is newer than every event that changes what it checked.
 - **`lookup_policy` selects the policy only on a single match.** Several matches are listed for the user to choose from; no `select_policy` tool.
 - **Refusals are tool results** (`refused: …`, `error: …`), never exceptions, so the model can recover.

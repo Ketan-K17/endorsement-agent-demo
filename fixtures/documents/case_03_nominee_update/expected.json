@@ -1,0 +1,40 @@
+{
+  "policy_copy.png": {
+    "doc_type": "policy_copy",
+    "quality": "ok",
+    "fields": {
+      "policy_no": "HLA/MC/88104577",
+      "reg_no": "TN09KV2261",
+      "holder_name": "Lakshmi Narayanan",
+      "chassis_no": "MBJB29BT6KD226140",
+      "engine_no": "1NRX2261904",
+      "hypothecated_to": null
+    }
+  },
+  "policy_copy_p2.png": {
+    "doc_type": "policy_copy",
+    "quality": "ok",
+    "fields": {
+      "nominee_name": "Suresh Narayanan",
+      "nominee_relation": "Spouse",
+      "nominee_age": "Age 49"
+    }
+  },
+  "aadhaar_front.png": {
+    "doc_type": "aadhaar",
+    "quality": "ok",
+    "fields": {
+      "name": "Lakshmi Narayanan",
+      "dob": "03/11/1979",
+      "aadhaar_no": "592018736420"
+    }
+  },
+  "aadhaar_back.png": {
+    "doc_type": "aadhaar",
+    "quality": "ok",
+    "fields": {
+      "aadhaar_no": "592018736420",
+      "address": "41, Bharathi Street, Mylapore, Chennai, Tamil Nadu 600004"
+    }
+  }
+}

@@ -26,7 +26,9 @@ A change to an existing motor policy: change of owner, nominee update, name corr
 - Usage caps and credentials (0011). Scope and build order (0012).
 - Requirements and context meter are Case File state, folded from events (0013).
 - Conditional requirements are waived by tool; insurer queries are answered by tool (0014).
-- Doc verdicts are set by code; validation is deterministic until step 4; approval needs a current passing verdict (0015).
+- Doc verdicts are set by code; approval needs a current passing verdict (0015).
+- Fixtures are filled templates; `FIXED_TODAY` pins the date (0016).
+- `validate_case` adds an LLM consistency pass on the judge role, after the deterministic checks pass (0017).
 
 ## What the owner said that isn't obvious from the design
 

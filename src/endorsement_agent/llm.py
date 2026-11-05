@@ -14,4 +14,6 @@ def chat_model(role: Role) -> AzureChatOpenAI:
         api_key=c.api_key,
         azure_deployment=c.deployment,
         api_version=c.api_version,
+        timeout=90,
+        max_retries=2,
     )

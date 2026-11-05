@@ -10,10 +10,8 @@ from __future__ import annotations
 import asyncio
 from collections.abc import Sequence
 from dataclasses import dataclass
-from datetime import datetime
 from pathlib import Path
 from typing import Any
-from zoneinfo import ZoneInfo
 
 from langchain_core.language_models import BaseChatModel
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage, ToolMessage
@@ -37,7 +35,6 @@ from endorsement_agent.runtime import Runtime, Upload
 from endorsement_agent.status import render_status, to_text
 
 SYSTEM_PROMPT = (Path(__file__).parent / "sop.md").read_text()
-TIMEZONE = ZoneInfo("Asia/Kolkata")  # the customers' and insurers' calendar
 
 
 def tool_calls_this_turn(messages: Sequence[BaseMessage]) -> int:
@@ -53,7 +50,7 @@ def tool_calls_this_turn(messages: Sequence[BaseMessage]) -> int:
 
 def model_input(messages: Sequence[BaseMessage], rt: Runtime) -> list[BaseMessage]:
     """What one model call sees. The status bar goes last and is not stored."""
-    bar = HumanMessage(to_text(render_status(rt.case, datetime.now(TIMEZONE).date())))
+    bar = HumanMessage(to_text(render_status(rt.case, rt.today())))
     return [SystemMessage(SYSTEM_PROMPT), *messages, bar]
 
 

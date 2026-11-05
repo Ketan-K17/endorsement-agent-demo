@@ -14,6 +14,7 @@ from typing import Any, Literal
 from langgraph.types import interrupt
 from pydantic import BaseModel, Field, ValidationError
 
+from endorsement_agent.consistency import consistency_issues, facts
 from endorsement_agent.events import (
     ApprovalDecided,
     ApprovalRequested,
@@ -440,6 +441,12 @@ async def validate_case(rt: Runtime, args: NoArgs) -> str:
     case = rt.case
     found = issues(case)
     previous = case.validation[-1].issues if case.validation else None
+    # The LLM pass runs only once the deterministic checks pass (ADR-0017).
+    if not found and rt.checker is not None:
+        rules = rt.rules.get(case.change_request.type, case.policy.insurer)  # type: ignore[union-attr]
+        found = await consistency_issues(
+            rt.checker, facts(case, rules.handover_if, rt.today()), previous or []
+        )
     event = ValidationCompleted(
         outcome="fail" if found else "pass", issues=found, diff_vs_prev=diff(previous, found)
     )

@@ -71,7 +71,7 @@ Small and coarse-grained. Every write goes through a validated tool.
 | Skills | `load_skill(name)` | Result is `loading skill <name>`; `SKILL.md` follows as a user message (ADR-0015); catalog lives in this tool's definition |
 | | `read_skill_file(skill, path)` | Reads a file under that skill's `references/`, sent like `load_skill`; sandboxed to the skill directory |
 | Conversation | `ask_user(questions[], reason)` | Budget gate + log only (ask budget 3). The question text itself is carried by the model's plain reply. The ack result is trivial and excluded from the compression count |
-| Validation | `validate_case()` | Deterministic checks (+ LLM pass from step 4); receives prior verdict and returns a diff (carry-forward) |
+| Validation | `validate_case()` | Deterministic checks, then an LLM consistency pass on the judge role (ADR-0017); receives prior verdict and returns a diff (carry-forward) |
 | Submission | `request_approval(summary)` | Pauses the graph (`interrupt()`); the user approves in the UI |
 | | `submit_to_insurer(case_id)` | Code-enforced: only if `approval.status == approved`; idempotent |
 | | `check_insurer_status(ref)` | Polls the mock insurer state machine (see below) |

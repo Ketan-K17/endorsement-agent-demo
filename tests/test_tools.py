@@ -2,14 +2,18 @@ from __future__ import annotations
 
 import json
 
+import httpx
+import openai
 import pytest
+from langchain_core.runnables import RunnableLambda
 
+from endorsement_agent.consistency import LLMChecker
 from endorsement_agent.events import ApprovalDecided, ApprovalRequested, ExtractedField
 from endorsement_agent.runtime import Classification, Runtime
 from endorsement_agent.skills import SkillLibrary
 from endorsement_agent.tools import TOOLS, call, definitions, execute
 from endorsement_agent.validation import compare
-from tests.fakes import FakeVision, runtime
+from tests.fakes import FakeChecker, FakeVision, runtime
 
 
 @pytest.fixture(scope="module")
@@ -273,3 +277,47 @@ async def test_handover(rt: Runtime) -> None:
     args = {"team": "endorsements-ops", "reason": "lapsed", "severity": "low"}
     await execute(rt, "handover", args)
     assert rt.case.handover is not None
+
+
+# --- validate_case LLM pass (ADR-0017) --------------------------------------------------------
+
+
+async def test_llm_pass_runs_only_after_the_deterministic_checks_pass(rt: Runtime) -> None:
+    rt.checker = checker = FakeChecker(["seller is not the policyholder"])
+    await execute(rt, "lookup_policy", {"policy_no": "NWG-MOT-240117"})
+    await execute(rt, "validate_case", {})
+    assert checker.calls == []
+    await owner_transfer_ready(rt)
+    out = json.loads(await execute(rt, "validate_case", {}))
+    assert out["outcome"] == "fail"
+    assert out["issues"] == ["consistency: seller is not the policyholder"]
+    facts = json.loads(checker.calls[0][0])
+    assert facts["today"] == "2026-10-25"
+    assert "seller on the RC is not the policyholder" in facts["handover_if"]
+    assert [d["type"] for d in facts["documents"]] == ["rc", "transfer_form", "aadhaar"]
+
+
+async def test_llm_pass_gets_its_previous_issues_back_and_can_clear_them(rt: Runtime) -> None:
+    await owner_transfer_ready(rt)
+    rt.checker = checker = FakeChecker(["b differs", "a differs"])
+    first = json.loads(await execute(rt, "validate_case", {}))
+    assert first["issues"] == ["consistency: a differs", "consistency: b differs"]
+    checker.issues = []
+    second = json.loads(await execute(rt, "validate_case", {}))
+    assert checker.calls[1][1] == ["a differs", "b differs"]
+    assert second["outcome"] == "pass"
+    assert second["diff_vs_prev"] == ["- consistency: a differs", "- consistency: b differs"]
+
+
+async def test_llm_checker_fails_closed() -> None:
+    request = httpx.Request("POST", "https://example.test")
+    error = openai.APIConnectionError(message="secret detail", request=request)
+    model = RunnableLambda(lambda _: (_ for _ in ()).throw(error))
+
+    class Model:
+        def with_structured_output(self, schema: object, **kwargs: object) -> object:
+            return model
+
+    issues = await LLMChecker(Model()).check("{}", [])  # type: ignore[arg-type]
+    assert len(issues) == 1 and "could not run" in issues[0]
+    assert "secret detail" not in issues[0]

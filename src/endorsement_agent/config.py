@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+from datetime import date
 from typing import Literal
 
 from pydantic import BaseModel, SecretStr
@@ -25,6 +26,12 @@ def role_config(role: Role) -> RoleConfig:
     if missing:
         raise RuntimeError(f"missing env vars: {', '.join(missing)}")
     return RoleConfig.model_validate({f: os.environ[n] for f, n in names.items()})
+
+
+def fixed_today() -> date | None:
+    """`FIXED_TODAY` (YYYY-MM-DD) pins the date so fixture dates never go stale (ADR-0016)."""
+    value = os.environ.get("FIXED_TODAY")
+    return date.fromisoformat(value) if value else None
 
 
 class Limits(BaseModel):

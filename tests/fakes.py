@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
+from datetime import date
 from typing import Any
 
 from langchain_core.callbacks import CallbackManagerForLLMRun
@@ -90,6 +91,18 @@ class FakeVision:
         return {k: v for k, v in self.fields[upload.doc_id].items() if k in fields}
 
 
+class FakeChecker:
+    """Returns `issues` and records what it was given."""
+
+    def __init__(self, issues: list[str] | None = None) -> None:
+        self.issues = issues or []
+        self.calls: list[tuple[str, list[str]]] = []
+
+    async def check(self, facts: str, previous: list[str]) -> list[str]:
+        self.calls.append((facts, previous))
+        return self.issues
+
+
 def runtime(skills: SkillLibrary, case_id: str = "case-1", ask_budget: int = 3) -> Runtime:
     store = EventStore()
     store.create(CaseCreated(case_id=case_id, ask_budget=ask_budget))
@@ -101,4 +114,5 @@ def runtime(skills: SkillLibrary, case_id: str = "case-1", ask_budget: int = 3) 
         insurer=MockInsurer(),
         skills=skills,
         vision=FakeVision(),
+        fixed_today=date(2026, 10, 25),
     )

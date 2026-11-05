@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from datetime import date, datetime
 from typing import Literal, Protocol
+from zoneinfo import ZoneInfo
 
 from pydantic import BaseModel
 
@@ -14,6 +16,8 @@ from endorsement_agent.mock_world.insurer import InsurerStep, MockInsurer
 from endorsement_agent.mock_world.policies import PolicyStore
 from endorsement_agent.mock_world.rules import RulesMaster
 from endorsement_agent.skills import SkillLibrary
+
+TIMEZONE = ZoneInfo("Asia/Kolkata")  # the customers' and insurers' calendar
 
 
 class Upload(BaseModel):
@@ -43,6 +47,12 @@ class Vision(Protocol):
     ) -> dict[str, ExtractedField]: ...
 
 
+class Checker(Protocol):
+    """The LLM pass of `validate_case` (ADR-0017): issues the deterministic checks can't see."""
+
+    async def check(self, facts: str, previous: list[str]) -> list[str]: ...
+
+
 @dataclass
 class Runtime:
     case_id: str
@@ -53,7 +63,12 @@ class Runtime:
     skills: SkillLibrary
     vision: Vision
     insurer_script: list[InsurerStep] | None = None  # per eval scenario; None = default
+    checker: Checker | None = None  # None skips the LLM pass (unit tests)
+    fixed_today: date | None = None  # for demos and evals (FIXED_TODAY); None = the real date
     uploads: dict[str, Upload] = field(default_factory=dict)
+
+    def today(self) -> date:
+        return self.fixed_today or datetime.now(TIMEZONE).date()
 
     @property
     def case(self) -> CaseFile:

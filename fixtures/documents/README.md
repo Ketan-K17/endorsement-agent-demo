@@ -35,6 +35,6 @@ Spread the three fictional insurers across the cases (**Northwind General**, **C
 
 ## After tweaking
 
-Run the extractor over each case once. We compare its output with `personas.yaml`, correct either side, and save the agreed values as `expected.json` in each case folder. Those values are the ground truth for the extraction and scenario evals.
+`expected.json` in each case folder holds what each document shows, written by hand, never copied from model output. `uv run python tools/extract_fixtures.py` runs the real extractor and prints every field that differs. Values are as printed (dates `DD/MM/YYYY`, `Age 58`); `null` means absent. Those values are the ground truth for the extraction and scenario evals.
 
 Minimum viable set to start: cases 01, 03 and 05. Add the rest as you find documents.

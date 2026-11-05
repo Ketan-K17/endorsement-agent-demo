@@ -1,7 +1,7 @@
 """Terminal chat against the real models: `uv run python -m endorsement_agent`.
 
-A smoke test for step 3. Needs `.env` with the AGENT and COMPRESSOR roles. Uploads and
-document reading arrive with step 4; until then vision tools refuse.
+A smoke test. Needs `.env` with all four roles. A line
+`/upload <path> ...` attaches documents to the next message.
 """
 
 from __future__ import annotations
@@ -9,31 +9,24 @@ from __future__ import annotations
 import asyncio
 import json
 import uuid
+from pathlib import Path
 
 from dotenv import load_dotenv
 
-from endorsement_agent.config import Limits
+from endorsement_agent.config import Limits, fixed_today
+from endorsement_agent.consistency import LLMChecker
 from endorsement_agent.event_store import EventStore
-from endorsement_agent.events import CaseCreated, ExtractedField
+from endorsement_agent.events import CaseCreated
 from endorsement_agent.graph import Agent, build_graph
 from endorsement_agent.history import LLMCompressor
 from endorsement_agent.llm import chat_model
 from endorsement_agent.mock_world.insurer import MockInsurer
 from endorsement_agent.mock_world.policies import PolicyStore
 from endorsement_agent.mock_world.rules import RulesMaster
-from endorsement_agent.runtime import Classification, Runtime, Upload, VisionError
+from endorsement_agent.runtime import Runtime, Upload
 from endorsement_agent.skills import SkillLibrary
 from endorsement_agent.tracing import callbacks
-
-
-class NoVision:
-    async def classify(self, upload: Upload, doc_types: list[str]) -> Classification:
-        raise VisionError("document reading is not available yet")
-
-    async def extract(
-        self, upload: Upload, doc_type: str, fields: list[str]
-    ) -> dict[str, ExtractedField]:
-        raise VisionError("document reading is not available yet")
+from endorsement_agent.vision import LLMVision
 
 
 async def main() -> None:
@@ -55,13 +48,23 @@ async def main() -> None:
         rules=RulesMaster.load(),
         insurer=MockInsurer(),
         skills=SkillLibrary(),
-        vision=NoVision(),
+        vision=LLMVision(chat_model("extractor")),
+        checker=LLMChecker(chat_model("judge")),
+        fixed_today=fixed_today(),
     )
     graph = build_graph(rt, chat_model("agent"), LLMCompressor(chat_model("compressor")), limits)
     agent = Agent(rt, graph, callbacks())
     print(f"{case_id} — type a message; empty line to quit.")
+    pending: list[Upload] = []
     while text := input("you> ").strip():
-        result = await agent.send(text)
+        if text.startswith("/upload "):
+            for name in text.split()[1:]:
+                path = Path(name)
+                mime = "image/jpeg" if path.suffix.lower() in (".jpg", ".jpeg") else "image/png"
+                pending.append(rt.add_upload(path.name, mime, path.read_bytes()))
+            continue
+        result = await agent.send(text, pending)
+        pending = []
         while result.approval is not None:
             print(f"[approval] {result.approval['summary']}")
             answer = input("approve? [y/n/c(hanges)] ").strip().lower()[:1]

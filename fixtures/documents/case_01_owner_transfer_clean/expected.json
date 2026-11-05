@@ -1,0 +1,81 @@
+{
+  "policy_copy.png": {
+    "doc_type": "policy_copy",
+    "quality": "ok",
+    "fields": {
+      "policy_no": "NWG-MOT-240117",
+      "reg_no": "KA05MZ4182",
+      "holder_name": "Anand Kulkarni",
+      "chassis_no": "MA3EWDE1S00418217",
+      "engine_no": "K12MN4471823",
+      "hypothecated_to": null
+    }
+  },
+  "policy_copy_p2.png": {
+    "doc_type": "policy_copy",
+    "quality": "ok",
+    "fields": {
+      "nominee_name": "Sunanda Kulkarni",
+      "nominee_relation": "Spouse",
+      "nominee_age": "Age 58"
+    }
+  },
+  "rc_old_owner.png": {
+    "doc_type": "rc",
+    "quality": "ok",
+    "fields": {
+      "reg_no": "KA05MZ4182",
+      "owner_name": "Anand Kulkarni",
+      "chassis_no": "MA3EWDE1S00418217",
+      "engine_no": "K12MN4471823",
+      "hypothecated_to": null
+    }
+  },
+  "rc_new_owner.png": {
+    "doc_type": "rc",
+    "quality": "ok",
+    "fields": {
+      "reg_no": "KA05MZ4182",
+      "owner_name": "Meera Shetty",
+      "chassis_no": "MA3EWDE1S00418217",
+      "engine_no": "K12MN4471823",
+      "hypothecated_to": null
+    }
+  },
+  "aadhaar_front.png": {
+    "doc_type": "aadhaar",
+    "quality": "ok",
+    "fields": {
+      "name": "Meera Shetty",
+      "dob": "22/07/1991",
+      "aadhaar_no": "481527390164"
+    }
+  },
+  "aadhaar_back.png": {
+    "doc_type": "aadhaar",
+    "quality": "ok",
+    "fields": {
+      "aadhaar_no": "481527390164",
+      "address": "D/O Prakash Shetty, 22, Lakeview Layout, Mysuru, Karnataka 570008"
+    }
+  },
+  "pan.png": {
+    "doc_type": "pan",
+    "quality": "ok",
+    "fields": {
+      "name": "Meera Shetty",
+      "dob": "22/07/1991",
+      "pan_no": "QWRTS4821K"
+    }
+  },
+  "transfer_form.png": {
+    "doc_type": "transfer_form",
+    "quality": "ok",
+    "fields": {
+      "reg_no": "KA05MZ4182",
+      "seller_name": "Anand Kulkarni",
+      "buyer_name": "Meera Shetty",
+      "transfer_date": "09/10/2026"
+    }
+  }
+}

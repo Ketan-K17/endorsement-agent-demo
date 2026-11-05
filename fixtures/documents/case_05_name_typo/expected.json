@@ -1,0 +1,43 @@
+{
+  "policy_copy.png": {
+    "doc_type": "policy_copy",
+    "quality": "ok",
+    "fields": {
+      "policy_no": "CDM-PV-5529417",
+      "reg_no": "GJ01RT8840",
+      "holder_name": "Jignesh Pattel",
+      "chassis_no": "MA1TA2HN4P2884013",
+      "engine_no": "HN4P288407",
+      "hypothecated_to": null
+    }
+  },
+  "policy_copy_p2.png": {
+    "doc_type": "policy_copy",
+    "quality": "ok",
+    "fields": {
+      "nominee_name": null,
+      "nominee_relation": null,
+      "nominee_age": null
+    }
+  },
+  "rc.png": {
+    "doc_type": "rc",
+    "quality": "ok",
+    "fields": {
+      "reg_no": "GJ01RT8840",
+      "owner_name": "Jignesh Patel",
+      "chassis_no": "MA1TA2HN4P2884013",
+      "engine_no": "HN4P288407",
+      "hypothecated_to": null
+    }
+  },
+  "pan.png": {
+    "doc_type": "pan",
+    "quality": "ok",
+    "fields": {
+      "name": "Jignesh Patel",
+      "dob": "17/04/1985",
+      "pan_no": "CMNPP5520H"
+    }
+  }
+}
