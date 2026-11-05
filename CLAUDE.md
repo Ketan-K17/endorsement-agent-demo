@@ -17,7 +17,7 @@ Portfolio demo of an agentic insurance-endorsement assistant. Performative, not 
 
 - Nothing proprietary: no text, prompts, node structure, rule rows or identifiers copied from any employer system. The production rulebook only inspired the *shape* of the mock rules master. Write all SOP, skill and rule content fresh, terse, from public knowledge.
 - Insurers are fictional: Northwind General, Cedar Mutual, Halcyon Assurance.
-- Real documents never enter git. They live in untracked `private_docs/`. Only tweaked files go in `fixtures/documents/` (see its README).
+- Real documents and templates never enter git. They live in untracked `private_docs/`. Only finished fixtures go in `fixtures/documents/` (see its README, ADR-0016).
 - No secrets in git. Credentials come from `.env` (gitignored); `.env.example` lists names only. Never print key values in logs, output or traces.
 - No PII in logs or traces beyond what the fixtures contain (which are tweaked).
 
@@ -56,13 +56,13 @@ Update this block when a step finishes.
 - [x] 1. Case File, event store, `render_status` + snapshot tests (ADR-0013)
 - [x] 2. Mock world: policies, rules master, insurer state machine (ADR-0014)
 - [x] 3. Tools + LangGraph loop + status bar + image stubbing + compression (ADR-0015; live smoke run `python -m endorsement_agent` pending `.env`)
-- [ ] 4. Extraction against fixture documents (needs tweaked docs from the user)  ← next
+- [ ] 4. Extraction against fixture documents (cases 01, 03, 05 built, ADR-0016)  ← next
 - [ ] 5. API + SSE + UI
 - [ ] 6. Evals + nightly runs
 - [ ] 7. Deploy to Hugging Face Spaces with limits (needs credentials sign-off)
 
 ## Waiting on the user
 
-- Tweaked documents per `fixtures/documents/README.md` (start with cases 01, 03, 05), matching the drafted `personas.yaml`. Needed at step 4.
+- Templates for cases 02, 04, 06 (later).
 - Personal Langfuse project credentials (tracing is optional until then).
 - `.env` with Azure credentials for the roles above.

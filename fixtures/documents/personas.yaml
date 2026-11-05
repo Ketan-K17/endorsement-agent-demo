@@ -51,6 +51,8 @@ case_05_name_typo:
   reg_no: GJ01RT8840
   name_on_policy: Jignesh Pattel     # misspelt
   correct_name: Jignesh Patel
+  relative_name: S/O Harshad Patel
+  dob: 1985-04-17
   pan_no: CMNPP5520H
 
 case_06_wrong_docs:

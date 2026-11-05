@@ -31,7 +31,7 @@ A change to an existing motor policy: change of owner, nominee update, name corr
 ## What the owner said that isn't obvious from the design
 
 - Keep the SOP and skills **very terse**; they will be iterated soon.
-- Use **tweaked production documents**, not hand-made mock documents, for end-to-end tests ("fake docs look stupid"). The owner supplies them.
+- Fixture documents are **real-looking templates filled with persona values**, not hand-made mocks ("fake docs look stupid"). The owner supplies the templates (0016).
 - Context compression's purpose is to be a proof of concept of how it should work, not to save tokens.
 - Show the Context tab: green for what is still in the prompt, red for what has left it. Low priority; a static page is acceptable.
 - Reduce latency as much as possible (parallel tool calls, streaming activity).
@@ -54,7 +54,7 @@ Generic descriptions only; the production specifics stay out of this repo.
 ## Known risks the owner accepted
 
 - The demo may use an existing Azure OpenAI resource for now, behind strict caps (0011). Moving to personal keys must stay an env-var change.
-- Tweaked production documents carry residual re-identification risk (QR codes, photos, metadata). The tweak guidelines in `fixtures/documents/README.md` are mandatory, and the owner is responsible for the final check before any file is committed.
+- Fixtures derived from a production document or an online sample carry residual re-identification risk. The guidelines in `fixtures/documents/README.md` are mandatory, and the owner is responsible for the final check before any file is committed.
 
 ## Out of scope for v1
 

@@ -165,7 +165,7 @@ CI: fast suite on PR (A + ~10 scenarios at k=1); full suite nightly; results tab
 
 ## 12. Test documents
 
-Real production documents are used only for private end-to-end testing from a local stash that is never committed (`.gitignore`d `private_docs/`). The repo ships a curated suite of tweaked docs for end users to try, under `fixtures/documents/` (one folder per case, `personas.yaml`, tweak guidelines in its README). Ground truth per case is `expected.json`, agreed after running the extractor.
+Templates and any production source stay in a local stash that is never committed (`.gitignore`d `private_docs/`). The repo ships a curated suite of docs filled from `personas.yaml` for end users to try, under `fixtures/documents/` (one folder per case, guidelines in its README; ADR-0016). Ground truth per case is `expected.json`, agreed after running the extractor.
 
 ## 13. Mock world
 
@@ -205,4 +205,4 @@ Public GitHub repo `endorsement-agent`, MIT license, README states all data is s
 ## 19. Open items
 
 - Revisit model-per-role after the first eval runs.
-- Final doc set (user supplies tweaked documents per `fixtures/documents/README.md`).
+- Final doc set (cases 02, 04, 06 still need building per `fixtures/documents/README.md`).

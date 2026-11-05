@@ -1,6 +1,8 @@
 # Fixture documents
 
-Test documents for the demo and its evals. They are **tweaked production documents**: real layouts, fake data. Originals never enter git; keep them in the untracked `private_docs/` at the repo root. Only the finished, tweaked files go in the folders here.
+Test documents for the demo and its evals: realistic layouts, fake data (ADR-0016). Templates and the script that fills them live in the untracked `private_docs/` at the repo root and never enter git. Only the finished files go in the folders here.
+
+Built so far: cases 01, 03 and 05, except the optional `nominee_id`. A policy copy is two files, `policy_copy` and `policy_copy_p2`. An RC is one image, front above back. RC, Aadhaar and PAN fixtures carry a SPECIMEN mark.
 
 ## How the folders work
 
@@ -26,7 +28,7 @@ Spread the three fictional insurers across the cases (**Northwind General**, **C
 3. **Keep formats valid but unreal.** Registration numbers in the real pattern (`KA01AB1234`) but not a plausible live vehicle; PAN as `AAAAA9999A` with a made-up value; Aadhaar as 12 digits that you invent. Never keep a real prefix-plus-suffix combination. Dates move together: keep the same gaps between issue, expiry and transfer dates as the original.
 4. **Photos and QR codes**: replace face photos with a neutral silhouette or a generated avatar. Blank out QR codes and barcodes, or replace them with a generated dummy QR that encodes nothing real.
 5. **Insurer branding**: swap real insurer names, logos and URLs for one of the three fictional insurers. Do not leave a real logo anywhere, including watermarks and footers.
-6. **Keep the layout, fonts and quirks** (stamps, folds, slight skew, small print). Realism is the reason to use production documents. Avoid clean, perfectly typeset results.
+6. **Keep the layout, fonts and quirks** (stamps, folds, slight skew, small print). Realism is the point. Avoid clean, perfectly typeset results.
 7. **Flatten and strip.** Export as a flattened PNG or JPG, never a PDF with a text layer (the original text lives in it). Strip metadata: `exiftool -all= file.png`.
 8. **Degraded variants** are made from the clean file *after* tweaking (blur, crop, rotate), not from the original.
 9. **Never commit originals**, screenshots of the editing process, or the `private_docs/` folder. If in doubt, leave the file out.
