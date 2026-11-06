@@ -165,7 +165,8 @@ async def test_image_stubbed_after_extraction(rt: Runtime) -> None:
     )
     await a.send("here is my RC", uploads=[u])
     upload_msg = next(m for m in a.messages() if m.id == f"upload-{u.doc_id}")
-    assert upload_msg.content == f"[image {u.doc_id} — see extraction above]"
+    stub = f"[image {u.doc_id} removed — fields in extract_fields({u.doc_id}) result]"
+    assert upload_msg.content == stub
     assert isinstance(model.prompts[1][1].content, list)  # image still there before extraction
     assert [e.doc_id for e in rt.events() if isinstance(e, ImageStubbed)] == [u.doc_id]
 

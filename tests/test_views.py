@@ -87,7 +87,7 @@ async def test_a_stubbed_image_shows_the_upload_out_and_the_stub_in() -> None:
     uploads = [i for i in context_log(a.messages(), r.events(), r.today()) if i.kind == "upload"]
     assert [(i.in_prompt, i.text) for i in uploads] == [
         (False, f"[uploaded {u.doc_id}: rc.jpg] + image"),
-        (True, f"[image {u.doc_id} — see extraction above]"),
+        (True, f"[image {u.doc_id} removed — fields in extract_fields({u.doc_id}) result]"),
     ]
 
 

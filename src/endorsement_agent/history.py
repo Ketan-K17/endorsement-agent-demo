@@ -51,7 +51,7 @@ def stub_images(messages: list[BaseMessage], case: CaseFile) -> list[HumanMessag
     for m in messages:
         doc_id = (m.id or "").removeprefix(UPLOAD_PREFIX)
         if isinstance(m, HumanMessage) and m.id != doc_id and doc_id in done and _has_image(m):
-            text = f"[image {doc_id} — see extraction above]"
+            text = f"[image {doc_id} removed — fields in extract_fields({doc_id}) result]"
             out.append(HumanMessage(id=m.id, content=text))
     return out
 

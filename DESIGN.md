@@ -104,7 +104,7 @@ v1 = one change per case. Multi-change (two type skills in one case, shared docs
 Both transforms are applied to stored history, deterministically, and the originals are kept in the event log.
 
 ### 6.1 Image stubbing
-Uploaded images stay in context only until `classify_document` and `extract_fields` have run for that doc; then the image part is replaced in place with `[image doc_3 — see extraction above]`.
+Uploaded images stay in context only until `classify_document` and `extract_fields` have run for that doc; then the image part is replaced in place with `[image doc_3 removed — fields in extract_fields(doc_3) result]`.
 
 ### 6.2 Tool-result compression (proof of concept)
 Purpose: demonstrate how context compression should work, not primarily to save tokens.

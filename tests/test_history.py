@@ -81,7 +81,8 @@ def test_stub_images_after_classify_and_extract() -> None:
     fields = {"reg_no": ExtractedField(value="KA05MZ4182", confidence=0.9)}
     rt.emit(DocumentExtracted(doc_id="doc_1", fields=fields))
     [stub] = stub_images([msg], rt.case)
-    assert stub.id == "upload-doc_1" and stub.content == "[image doc_1 — see extraction above]"
+    assert stub.id == "upload-doc_1"
+    assert stub.content == "[image doc_1 removed — fields in extract_fields(doc_1) result]"
     assert stub_images([stub], rt.case) == []  # already stubbed
 
 
