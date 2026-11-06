@@ -1,7 +1,8 @@
 """Case events: the single append-only stream behind the Case File (ADR-0008).
 
-Case File events plus the history transforms (image stubbing, compression), which the
-Context tab and evals replay. Model and UI events are added with the steps that emit them.
+Case File events, the history transforms (image stubbing, compression), and the
+conversation itself (messages, model calls, tool calls), which the UI feed, trace view,
+Context tab and evals replay. Conversation events do not change the Case File.
 """
 
 from __future__ import annotations
@@ -205,6 +206,39 @@ class ImageStubbed(_Event):
     doc_id: str
 
 
+class UserMessaged(_Event):
+    type: Literal["message.user"] = "message.user"
+    text: str
+    doc_ids: list[str] = Field(default_factory=list)
+
+
+class AssistantMessaged(_Event):
+    """Assistant text, final or alongside tool calls. Tokens stream separately, unstored."""
+
+    type: Literal["message.assistant"] = "message.assistant"
+    text: str
+
+
+class ModelCalled(_Event):
+    """One agent model call. `n_messages` places its status bar in the Context tab."""
+
+    type: Literal["model.called"] = "model.called"
+    n_messages: int  # stored history length at call time; the status bar followed them
+    duration_ms: int
+    input_tokens: int | None = None
+    output_tokens: int | None = None
+    tool_calls: int = 0
+
+
+class ToolCalled(_Event):
+    """A tool call started. Its `tool.result` (same `call_id`) gives the timing."""
+
+    type: Literal["tool.called"] = "tool.called"
+    tool: str
+    call_id: str
+    args: dict[str, Any] = Field(default_factory=dict)
+
+
 CaseEvent = Annotated[
     CaseCreated
     | PolicySelected
@@ -227,7 +261,11 @@ CaseEvent = Annotated[
     | HandoverRaised
     | ToolResultAdded
     | ContextCompressed
-    | ImageStubbed,
+    | ImageStubbed
+    | UserMessaged
+    | AssistantMessaged
+    | ModelCalled
+    | ToolCalled,
     Field(discriminator="type"),
 ]
 

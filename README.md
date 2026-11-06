@@ -8,4 +8,11 @@ A portfolio demo of an agentic insurance-endorsement assistant: LangGraph tool l
 - [GLOSSARY.md](GLOSSARY.md) — terms
 - [docs/adr](docs/adr) — decisions
 
-Status: design phase, no code yet.
+Run locally (needs `.env`, see `.env.example`):
+
+```
+uv sync
+uv run uvicorn endorsement_agent.api:create_app --factory --port 7860
+```
+
+then open http://localhost:7860. `uv run python -m endorsement_agent` is a terminal chat.

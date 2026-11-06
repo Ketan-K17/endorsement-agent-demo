@@ -2,14 +2,23 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
+
 from endorsement_agent.case_file import CaseFile, apply, fold
 from endorsement_agent.events import CaseCreated, CaseEvent
+
+Listener = Callable[[CaseEvent], None]
 
 
 class EventStore:
     def __init__(self) -> None:
         self._streams: dict[str, list[CaseEvent]] = {}
         self._cases: dict[str, CaseFile] = {}
+        self._listeners: dict[str, list[Listener]] = {}
+
+    def subscribe(self, case_id: str, listener: Listener) -> None:
+        """Call `listener` with each event appended to the case from now on (the API's SSE)."""
+        self._listeners.setdefault(case_id, []).append(listener)
 
     def create(self, event: CaseCreated) -> CaseFile:
         if event.case_id in self._streams:
@@ -29,6 +38,8 @@ class EventStore:
         case = apply(self._cases[case_id], stored)
         stream.append(stored)
         self._cases[case_id] = case
+        for listener in self._listeners.get(case_id, []):
+            listener(stored)
         return case
 
     def case(self, case_id: str) -> CaseFile:

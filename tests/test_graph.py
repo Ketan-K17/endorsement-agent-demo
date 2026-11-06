@@ -12,6 +12,8 @@ from endorsement_agent.events import (
     ContextCompressed,
     ExtractedField,
     ImageStubbed,
+    ModelCalled,
+    ToolCalled,
     ToolResultAdded,
 )
 from endorsement_agent.graph import Agent, build_graph
@@ -192,3 +194,42 @@ async def test_skill_text_follows_results_as_user_message(rt: Runtime) -> None:
     assert model.call_kwargs[2]["tool_choice_marker"] == "none"
     [result] = [e for e in rt.events() if isinstance(e, ToolResultAdded) and e.call_id == "s1"]
     assert result.attachment == skill.content
+
+
+async def test_a_turn_is_recorded_as_conversation_events(rt: Runtime) -> None:
+    a, _ = agent(
+        rt,
+        [
+            AIMessage(content="Looking.", tool_calls=[call("get_case", "g1")]),
+            AIMessage(content="All clear."),
+        ],
+    )
+    await a.send("status?")
+    types = [e.type for e in rt.events()[1:]]
+    assert types == [
+        "message.user",
+        "model.called",
+        "message.assistant",
+        "tool.called",
+        "tool.result",
+        "model.called",
+        "message.assistant",
+    ]
+    [first, second] = [e for e in rt.events() if isinstance(e, ModelCalled)]
+    assert (first.n_messages, first.tool_calls) == (1, 1)
+    assert (second.n_messages, second.tool_calls) == (3, 0)
+
+
+async def test_tool_called_is_not_repeated_on_resume(rt: Runtime) -> None:
+    await owner_transfer_ready(rt)
+    a, _ = agent(
+        rt,
+        [
+            calls(call("validate_case", "v1"), call("request_approval", "a1", summary="s")),
+            AIMessage(content="ok"),
+        ],
+    )
+    await a.send("go")
+    await a.resume({"decision": "approved"})
+    called = [e.call_id for e in rt.events() if isinstance(e, ToolCalled)]
+    assert called == ["v1", "a1"]

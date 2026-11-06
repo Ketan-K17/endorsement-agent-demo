@@ -1,0 +1,184 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Endorsement Agent</title>
+  <link rel="stylesheet" href="app.css">
+  <script src="app.js" defer></script>
+  <script src="intro.js" defer></script>
+</head>
+<body>
+  <header class="top">
+    <div>
+      <h1>Endorsement agent</h1>
+      <p class="sub">Portfolio demo. All insurers, policies and documents are synthetic.</p>
+    </div>
+    <div class="top-actions">
+      <span id="session-id" class="mono muted"></span>
+      <button id="how-it-works" type="button" class="ghost">How it works</button>
+      <button id="new-case" type="button" class="ghost">New case</button>
+    </div>
+  </header>
+
+  <dialog id="intro" class="intro" aria-labelledby="intro-title">
+    <button type="button" class="intro-skip" data-go="skip">Skip intro</button>
+
+    <section class="slide" data-next="Show me">
+      <div class="scene" data-figure="juggle"></div>
+      <p class="kicker">Welcome to the endorsement desk</p>
+      <h2 id="intro-title">Today, you wear <span class="squiggle">two hats</span>.</h2>
+      <p>An AI agent handles changes to motor insurance policies (in the trade, <em>endorsements</em>).
+        It needs someone to talk to and someone to answer to. Both of those are you.</p>
+    </section>
+
+    <section class="slide" data-next="Next: hat #2" hidden>
+      <div class="scene split" data-figure="customer">
+        <div class="mini-chat" aria-hidden="true">
+          <span class="me">I sold my car. Can the policy move to the buyer?</span>
+          <span class="bot">Sure! Please upload the new owner's RC and ID.</span>
+          <span class="me">📎 rc.png · id.png</span>
+        </div>
+      </div>
+      <p class="kicker">Hat #1</p>
+      <h2>The customer 🧢</h2>
+      <ol class="steps">
+        <li><strong>Pick a demo case.</strong> It drafts your message and attaches the documents.</li>
+        <li><strong>Hit send</strong> and answer the agent's questions, like a real policyholder would.</li>
+        <li><strong>Feel free to be difficult.</strong> Change your mind or contradict a document. It should cope.</li>
+      </ol>
+    </section>
+
+    <section class="slide" data-next="Next" hidden>
+      <div class="scene split" data-figure="swap">
+        <div class="mini-card" aria-hidden="true">
+          <strong>Your turn as approver</strong>
+          <span>Owner&nbsp; <s>A. Rao</s> → P. Rao</span>
+          <span>Policy NWG-MOT-240117</span>
+          <i class="stamp">Approved</i>
+        </div>
+      </div>
+      <p class="kicker">Hat #2 · swap!</p>
+      <h2>The approver 🎩</h2>
+      <p>The agent can't send anything to the insurer without a human's sign-off. When it's ready,
+        an <strong>approval card</strong> pops up in the chat and you become the reviewer.</p>
+      <ol class="steps">
+        <li><strong>Approve</strong> and it goes to the insurer.</li>
+        <li><strong>Request changes</strong> or <strong>Reject</strong> with a reason, and the agent has to deal with it.</li>
+      </ol>
+    </section>
+
+    <section class="slide" data-next="Put on hat #1" hidden>
+      <div class="scene" data-figure="stack"></div>
+      <p class="kicker">Bonus: peek behind the curtain</p>
+      <h2>Watch the agent think</h2>
+      <div class="peek">
+        <div><ol class="mini-stages" aria-hidden="true"><li></li><li></li><li></li><li></li><li></li><li></li></ol>
+          <strong>Status</strong><span>The case moving from intake to done, live.</span></div>
+        <div><span class="mini-bars" aria-hidden="true"><i></i><i></i><i></i></span>
+          <strong>Trace</strong><span>Every model and tool call, with timings.</span></div>
+        <div><span class="mini-ctx" aria-hidden="true"><i class="in"></i><i class="out"></i><i class="in"></i></span>
+          <strong>Context</strong><span>What the model sees, and what it no longer needs.</span></div>
+      </div>
+      <p class="muted small">Everything is made up: Northwind General, Cedar Mutual and Halcyon Assurance aren't real.</p>
+      <label class="name-tag">
+        <span>Last thing: who's wearing the hats today?</span>
+        <input id="user-name" type="text" maxlength="40" autocomplete="given-name"
+          placeholder="Your name, or a dashing alias">
+        <small class="muted">It goes on the case's assignee badge, and stays in your browser.</small>
+      </label>
+    </section>
+
+    <footer class="intro-nav">
+      <button type="button" class="ghost" data-go="back">Back</button>
+      <div class="intro-dots"></div>
+      <button type="button" data-go="next">Show me</button>
+    </footer>
+  </dialog>
+
+  <nav class="tabs" role="tablist">
+    <button role="tab" data-tab="chat" aria-selected="true">Chat</button>
+    <button role="tab" data-tab="trace" aria-selected="false">Trace</button>
+    <button role="tab" data-tab="context" aria-selected="false">Context</button>
+  </nav>
+
+  <div class="layout">
+    <main>
+      <section id="tab-chat" class="tab" role="tabpanel">
+        <details id="demo" class="demo" open>
+          <summary>Try a demo case</summary>
+          <div id="demo-cases" class="demo-cases"></div>
+          <details class="policies">
+            <summary>Demo policies</summary>
+            <div class="table-wrap"><table id="demo-policies"></table></div>
+          </details>
+        </details>
+
+        <div id="chat" class="chat" aria-live="polite"></div>
+
+        <section id="approval" class="approval" hidden>
+          <h2>Approval needed</h2>
+          <p id="approval-summary"></p>
+          <div class="table-wrap"><table id="approval-diff"></table></div>
+          <textarea id="approval-reason" rows="2"
+            placeholder="Reason (needed to reject or request changes)"></textarea>
+          <div class="row">
+            <button type="button" data-decision="approved">Approve</button>
+            <button type="button" data-decision="changes_requested" class="ghost">Request changes</button>
+            <button type="button" data-decision="rejected" class="danger">Reject</button>
+          </div>
+        </section>
+
+        <form id="composer" class="composer">
+          <div id="attachments" class="attachments"></div>
+          <div class="row">
+            <label class="ghost attach" title="Attach PNG or JPG documents">
+              Attach
+              <input id="file-input" type="file" accept="image/png,image/jpeg" multiple hidden>
+            </label>
+            <textarea id="text" rows="2" placeholder="Describe the change you need…"></textarea>
+            <button id="send" type="submit">Send</button>
+          </div>
+        </form>
+      </section>
+
+      <section id="tab-trace" class="tab" role="tabpanel" hidden>
+        <div class="row spread">
+          <p id="trace-totals" class="muted"></p>
+          <button id="replay" type="button" class="ghost">Replay this session</button>
+        </div>
+        <div class="table-wrap"><table id="trace" class="trace"></table></div>
+      </section>
+
+      <section id="tab-context" class="tab" role="tabpanel" hidden>
+        <p class="muted">
+          Everything the model has been shown, in order.
+          <span class="pill in">in the prompt</span>
+          <span class="pill out">left the prompt</span>
+          (old status bars, compressed tool results, stubbed images).
+        </p>
+        <div id="context"></div>
+      </section>
+    </main>
+
+    <aside>
+      <section class="panel" id="status">
+        <h2>Status</h2>
+        <ol id="stages" class="stages"></ol>
+        <p id="activity" class="activity"></p>
+        <p class="assignee">Assignee <span id="assignee" class="assignee-badge"></span></p>
+        <dl id="status-fields" class="fields"></dl>
+        <h3>Documents</h3>
+        <ul id="docs" class="docs"></ul>
+        <h3>Context</h3>
+        <div class="meter"><div id="meter-fill"></div></div>
+        <p id="meter-text" class="muted small"></p>
+      </section>
+      <section class="panel">
+        <h2>Activity</h2>
+        <ol id="feed" class="feed"></ol>
+      </section>
+    </aside>
+  </div>
+</body>
+</html>

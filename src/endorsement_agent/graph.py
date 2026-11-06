@@ -3,18 +3,27 @@
 The prompt is system (role + guidelines + SOP) → tool definitions → full history → status
 bar. The bar is built per call and never enters the state or the checkpoint.
 A turn ends on an assistant message with no tool calls (ADR-0010).
+Messages, model calls and tool calls are emitted as events for the UI, trace and evals.
 """
 
 from __future__ import annotations
 
 import asyncio
-from collections.abc import Sequence
+import time
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
 from langchain_core.language_models import BaseChatModel
-from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage, ToolMessage
+from langchain_core.messages import (
+    AIMessage,
+    AIMessageChunk,
+    BaseMessage,
+    HumanMessage,
+    SystemMessage,
+    ToolMessage,
+)
 from langchain_core.runnables import RunnableConfig
 from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.graph import END, START, MessagesState, StateGraph
@@ -23,7 +32,15 @@ from langgraph.types import Command
 
 from endorsement_agent import tools
 from endorsement_agent.config import Limits
-from endorsement_agent.events import ContextCompressed, ImageStubbed, ToolResultAdded
+from endorsement_agent.events import (
+    AssistantMessaged,
+    ContextCompressed,
+    ImageStubbed,
+    ModelCalled,
+    ToolCalled,
+    ToolResultAdded,
+    UserMessaged,
+)
 from endorsement_agent.history import (
     SKILL_PREFIX,
     Compressor,
@@ -35,6 +52,13 @@ from endorsement_agent.runtime import Runtime, Upload
 from endorsement_agent.status import render_status, to_text
 
 SYSTEM_PROMPT = (Path(__file__).parent / "sop.md").read_text()
+
+
+def text_of(content: str | list[Any]) -> str:
+    """The text parts of a message's content."""
+    if isinstance(content, str):
+        return content
+    return "".join(p if isinstance(p, str) else p.get("text", "") for p in content)
 
 
 def tool_calls_this_turn(messages: Sequence[BaseMessage]) -> int:
@@ -69,7 +93,21 @@ def build_graph(
     async def agent(state: MessagesState) -> dict[str, list[BaseMessage]]:
         messages = state["messages"]
         capped = tool_calls_this_turn(messages) >= limits.max_tool_calls_per_turn
+        started = time.monotonic()
         reply = await (reply_only if capped else with_tools).ainvoke(model_input(messages, rt))
+        assert isinstance(reply, AIMessage)
+        usage = reply.usage_metadata
+        rt.emit(
+            ModelCalled(
+                n_messages=len(messages),
+                duration_ms=round((time.monotonic() - started) * 1000),
+                input_tokens=usage["input_tokens"] if usage else None,
+                output_tokens=usage["output_tokens"] if usage else None,
+                tool_calls=len(reply.tool_calls),
+            )
+        )
+        if text := text_of(reply.content):
+            rt.emit(AssistantMessaged(text=text))
         return {"messages": [reply]}
 
     async def run_call(
@@ -109,7 +147,11 @@ def build_graph(
         events = rt.events()
         done = {e.call_id: e for e in events if isinstance(e, ToolResultAdded)}
         budget = limits.max_tool_calls_per_turn - tool_calls_this_turn(messages[:-1])
-        calls = [dict(c) for c in last.tool_calls]
+        calls: list[dict[str, Any]] = [dict(c) for c in last.tool_calls]
+        started = {e.call_id for e in events if isinstance(e, ToolCalled)}
+        for c in calls:
+            if c["id"] not in started:  # on resume after approval, already emitted
+                rt.emit(ToolCalled(tool=c["name"], call_id=c["id"], args=c["args"]))
         allowed = {c["id"]: i < budget for i, c in enumerate(calls)}
         # Parallel calls run concurrently; an approval waits for them, then interrupts.
         parallel = [c for c in calls if c["name"] != tools.APPROVAL_TOOL]
@@ -181,20 +223,46 @@ class Agent:
             "metadata": {"langfuse_session_id": rt.case_id},
         }
 
-    async def send(self, text: str, uploads: list[Upload] | None = None) -> TurnResult:
-        messages: list[BaseMessage] = [upload_message(u) for u in uploads or []]
+    async def send(
+        self,
+        text: str,
+        uploads: list[Upload] | None = None,
+        on_token: Callable[[str], None] | None = None,
+    ) -> TurnResult:
+        uploads = uploads or []
+        self.rt.emit(UserMessaged(text=text, doc_ids=[u.doc_id for u in uploads]))
+        messages: list[BaseMessage] = [upload_message(u) for u in uploads]
         messages.append(HumanMessage(text))
-        return await self._run({"messages": messages})
+        return await self._run({"messages": messages}, on_token)
 
-    async def resume(self, decision: dict[str, Any]) -> TurnResult:
-        return await self._run(Command(resume=decision))
+    async def resume(
+        self, decision: dict[str, Any], on_token: Callable[[str], None] | None = None
+    ) -> TurnResult:
+        return await self._run(Command(resume=decision), on_token)
 
-    async def _run(self, payload: dict[str, Any] | Command[Any]) -> TurnResult:
-        state = await self.graph.ainvoke(payload, self.config)
-        if pending := state.get("__interrupt__"):
-            return TurnResult(reply=None, approval=pending[0].value)
-        last = state["messages"][-1]
-        return TurnResult(reply=str(last.content), approval=None)
+    async def _run(
+        self, payload: dict[str, Any] | Command[Any], on_token: Callable[[str], None] | None
+    ) -> TurnResult:
+        """Run to the end of the turn or an approval interrupt, passing agent text deltas on."""
+        approval = None
+        chunk: Any
+        async for mode, chunk in self.graph.astream(
+            payload, self.config, stream_mode=["messages", "updates"]
+        ):
+            if mode == "messages":
+                message, meta = chunk
+                if (
+                    on_token is not None
+                    and meta.get("langgraph_node") == "agent"
+                    and isinstance(message, AIMessageChunk)
+                    and (delta := text_of(message.content))
+                ):
+                    on_token(delta)
+            elif pending := chunk.get("__interrupt__"):
+                approval = pending[0].value
+        if approval is not None:
+            return TurnResult(reply=None, approval=approval)
+        return TurnResult(reply=text_of(self.messages()[-1].content), approval=None)
 
     def messages(self) -> list[BaseMessage]:
         snapshot = self.graph.get_state(self.config)

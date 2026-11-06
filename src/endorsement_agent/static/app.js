@@ -1,0 +1,451 @@
+// Endorsement agent UI. Plain JS, no build step. Everything shown comes from the session's
+// SSE stream: case events (chat, activity, trace), token deltas, status bars, turn ends.
+"use strict";
+
+const STAGES = ["Intake", "Docs", "Validate", "Approval", "Insurer", "Done"];
+const $ = (id) => document.getElementById(id);
+
+const state = {
+  sid: null,
+  source: null,
+  events: [],
+  lastSeq: 0,
+  draft: null,          // the assistant bubble receiving tokens
+  feedRows: new Map(),  // call_id -> feed row
+  attachments: [],      // {filename, mime, data (base64)}
+  busy: false,
+  replaying: false,
+  status: null,         // the last status bar, so a name change can re-render the assignee
+};
+
+// --- helpers ---------------------------------------------------------------------------------
+
+function el(tag, attrs = {}, ...children) {
+  const node = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs)) {
+    if (k === "class") node.className = v;
+    else if (k === "text") node.textContent = v;
+    else node.setAttribute(k, v);
+  }
+  for (const c of children) if (c != null) node.append(c);
+  return node;
+}
+
+function escapeHtml(s) {
+  return s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+}
+
+// Just enough markdown for agent replies: paragraphs, "- " lists, **bold**. Escaped first.
+function renderMarkdown(text) {
+  const inline = (s) => escapeHtml(s).replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
+  const out = [];
+  let list = null;
+  for (const line of text.split("\n")) {
+    const item = line.match(/^\s*[-*•]\s+(.*)/) || line.match(/^\s*\d+[.)]\s+(.*)/);
+    if (item) {
+      list = list || [];
+      list.push(`<li>${inline(item[1])}</li>`);
+      continue;
+    }
+    if (list) { out.push(`<ul>${list.join("")}</ul>`); list = null; }
+    if (line.trim()) out.push(`<p>${inline(line)}</p>`);
+  }
+  if (list) out.push(`<ul>${list.join("")}</ul>`);
+  return out.join("");
+}
+
+const ms = (a, b) => new Date(b) - new Date(a);
+const secs = (n) => (n >= 1000 ? `${(n / 1000).toFixed(1)}s` : `${n}ms`);
+const short = (v, n = 60) => { const s = typeof v === "string" ? v : JSON.stringify(v); return s.length > n ? s.slice(0, n - 1) + "…" : s; };
+
+async function api(path, body) {
+  const r = await fetch(path, body === undefined ? { method: "POST" } : {
+    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
+  });
+  if (!r.ok) {
+    let detail = r.statusText;
+    try { const j = await r.json(); detail = typeof j.detail === "string" ? j.detail : "invalid request"; } catch { /* not JSON */ }
+    throw new Error(detail);
+  }
+  return r.json();
+}
+
+function scrollDown(node) { node.scrollTop = node.scrollHeight; }
+
+// --- session ---------------------------------------------------------------------------------
+
+async function newSession() {
+  if (state.source) state.source.close();
+  Object.assign(state, { events: [], lastSeq: 0, draft: null, busy: false, attachments: [] });
+  state.feedRows.clear();
+  for (const id of ["chat", "feed", "trace", "context"]) $(id).replaceChildren();
+  $("approval").hidden = true;
+  renderAttachments();
+  const { session_id } = await api("/api/sessions");
+  state.sid = session_id;
+  $("session-id").textContent = session_id;
+  const source = new EventSource(`/api/sessions/${session_id}/stream`);
+  source.addEventListener("event", (m) => onCaseEvent(JSON.parse(m.data)));
+  source.addEventListener("token", (m) => onToken(JSON.parse(m.data).text));
+  source.addEventListener("status", (m) => renderStatus(JSON.parse(m.data)));
+  source.addEventListener("turn", (m) => onTurn(JSON.parse(m.data)));
+  source.addEventListener("agent_error", (m) => {
+    addBubble("error", JSON.parse(m.data).message);
+    state.draft = null;
+  });
+  state.source = source;
+}
+
+// --- stream handlers -------------------------------------------------------------------------
+
+function onCaseEvent(e) {
+  if (e.seq <= state.lastSeq) return;  // a reconnect may resend
+  state.lastSeq = e.seq;
+  state.events.push(e);
+  if (!state.replaying) showEvent(e, state.events);
+  if (!$("tab-trace").hidden) renderTrace();
+}
+
+function showEvent(e, events) {
+  switch (e.type) {
+    case "message.user": {
+      const names = e.doc_ids.map((id) => events.find((x) => x.type === "document.uploaded" && x.doc_id === id)?.filename || id);
+      addBubble("user", e.text, names);
+      break;
+    }
+    case "message.assistant":
+      if (state.draft) {
+        state.draft.classList.remove("streaming");
+        state.draft.innerHTML = renderMarkdown(e.text);
+        state.draft = null;
+      } else addBubble("assistant", e.text);
+      break;
+    case "tool.called": {
+      const row = feedRow(e.tool, short(e.args, 40), "running", "running");
+      state.feedRows.set(e.call_id, { row, ts: e.ts });
+      break;
+    }
+    case "tool.result": {
+      const entry = state.feedRows.get(e.call_id);
+      if (!entry) break;
+      entry.row.className = /^(refused|error)/.test(e.content) ? "refused" : "";
+      entry.row.querySelector(".time").textContent = secs(ms(entry.ts, e.ts));
+      break;
+    }
+    case "model.called": {
+      const tokens = e.input_tokens != null ? ` · ${e.input_tokens}→${e.output_tokens} tok` : "";
+      feedRow("model", e.tool_calls ? `${e.tool_calls} tool call(s)` : "reply", secs(e.duration_ms) + tokens, "model");
+      break;
+    }
+    case "context.compressed":
+      feedRow("compressed", `${e.call_ids.length} results, ${(e.tokens_before / 1000).toFixed(1)}k → ${(e.tokens_after / 1000).toFixed(1)}k tokens`, "", "compressed");
+      break;
+    case "history.image_stubbed":
+      feedRow("image stubbed", e.doc_id, "", "compressed");
+      break;
+  }
+}
+
+function onToken(text) {
+  if (state.replaying) return;
+  if (!state.draft) state.draft = addBubble("assistant", "", [], true);
+  state.draft.textContent += text;
+  scrollDown($("chat"));
+}
+
+function onTurn(turn) {
+  state.draft = null;
+  if (turn.approval) showApproval(turn.approval);
+  if (!$("tab-context").hidden) renderContext();
+}
+
+// --- chat ------------------------------------------------------------------------------------
+
+function addBubble(kind, text, files = [], streaming = false) {
+  const bubble = el("div", { class: `bubble ${kind}${streaming ? " streaming" : ""}` });
+  if (kind === "assistant" && !streaming) bubble.innerHTML = renderMarkdown(text);
+  else bubble.textContent = text;
+  if (files.length) bubble.append(el("span", { class: "files", text: `📎 ${files.join(", ")}` }));
+  $("chat").append(bubble);
+  scrollDown($("chat"));
+  return bubble;
+}
+
+function feedRow(name, detail, time, cls) {
+  const row = el("li", { class: cls },
+    el("span", { class: "name", text: detail ? `${name} ${detail}` : name }),
+    el("span", { class: "time", text: time }));
+  $("feed").append(row);
+  scrollDown($("feed"));
+  return row;
+}
+
+function setBusy(busy) {
+  state.busy = busy;
+  $("send").disabled = busy;
+  for (const b of $("approval").querySelectorAll("button")) b.disabled = busy;
+}
+
+async function send(event) {
+  event.preventDefault();
+  const text = $("text").value.trim() || (state.attachments.length ? "Documents attached." : "");
+  if (!text || state.busy) return;
+  setBusy(true);
+  try {
+    await api(`/api/sessions/${state.sid}/messages`, { text, files: state.attachments });
+    $("text").value = "";
+    state.attachments = [];
+    renderAttachments();
+    $("demo").open = false;
+  } catch (err) {
+    addBubble("error", err.message);
+    setBusy(false);
+  }
+}
+
+// --- attachments and demo picker -------------------------------------------------------------
+
+function toBase64(blob) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result).split(",", 2)[1]);
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(blob);
+  });
+}
+
+async function attach(filename, blob) {
+  const mime = blob.type === "image/jpeg" ? "image/jpeg" : "image/png";
+  state.attachments.push({ filename, mime, data: await toBase64(blob) });
+  renderAttachments();
+}
+
+function renderAttachments() {
+  $("attachments").replaceChildren(...state.attachments.map((a, i) => {
+    const remove = el("button", { type: "button", title: "Remove", text: "×" });
+    remove.onclick = () => { state.attachments.splice(i, 1); renderAttachments(); };
+    return el("span", { class: "chip" }, a.filename, remove);
+  }));
+}
+
+async function loadDemo() {
+  const demo = await fetch("/api/demo").then((r) => r.json());
+  $("demo-cases").replaceChildren(...demo.cases.map((c) => {
+    const use = el("button", { type: "button", class: "ghost", text: `Use (${c.docs.length} docs)` });
+    use.onclick = async () => {
+      use.disabled = true;
+      state.attachments = [];
+      for (const doc of c.docs) {
+        const blob = await fetch(`/fixtures/${c.id}/${doc}`).then((r) => r.blob());
+        await attach(doc, blob);
+      }
+      $("text").value = c.starter;
+      use.disabled = false;
+      $("text").focus();
+    };
+    return el("div", { class: "demo-case" }, el("strong", { text: c.title }), el("p", { text: c.starter }), use);
+  }));
+  const head = el("tr", {}, ...["Policy", "Insurer", "Reg no", "Holder", "Vehicle"].map((h) => el("th", { text: h })));
+  $("demo-policies").replaceChildren(el("thead", {}, head), el("tbody", {}, ...demo.policies.map((p) => {
+    const row = el("tr", { title: "Use in a message" }, ...[p.policy_no, p.insurer, p.reg_no, p.holder, p.vehicle].map((v) => el("td", { text: v })));
+    row.onclick = () => { $("text").value = `I need a change on my policy ${p.policy_no}.`; $("text").focus(); };
+    return row;
+  })));
+}
+
+// --- status bar ------------------------------------------------------------------------------
+
+function renderStatus(s) {
+  state.status = s;
+  renderAssignee(s.assignee);
+  const current = STAGES.indexOf(s.stage);
+  const stages = STAGES.map((name, i) =>
+    el("li", { class: i < current ? "done" : i === current ? "current" : "", text: name }));
+  if (s.stage === "Handover") stages.push(el("li", { class: "handover", text: "Handover" }));
+  $("stages").replaceChildren(...stages);
+
+  const busy = !["idle", "waiting for approval"].includes(s.current_activity);
+  $("activity").textContent = s.current_activity;
+  $("activity").className = `activity${busy ? " busy" : ""}`;
+  setBusy(busy);
+
+  const t = s.trace_view;
+  const fields = [
+    ["Today", s.today],
+    ["Skills", s.active_skills.join(", ") || "–"],
+    ["Slots", `${s.slots.filled}/${s.slots.total}` + (s.slots.low_conf.length ? ` · low confidence: ${s.slots.low_conf.join(", ")}` : "")],
+    ["Asks", `${s.ask_budget.used}/${s.ask_budget.max}`],
+    ["Validation", s.validation.verdict + (s.validation.changed_since_last ? " (changed)" : "")],
+    ["Approval", s.approval],
+    ["Insurer", s.insurer.stage.replace("_", " ") + (s.insurer.ref ? ` · ${s.insurer.ref}` : "")],
+    ["Trace", `${t.model_calls} model calls · ${t.tool_calls} tool calls · ${t.input_tokens + t.output_tokens} tokens`],
+  ];
+  $("status-fields").replaceChildren(...fields.flatMap(([k, v]) => [el("dt", { text: k }), el("dd", { text: v })]));
+
+  $("docs").replaceChildren(...(s.docs_checklist.length ? s.docs_checklist.map((d) =>
+    el("li", {}, el("span", { class: `state ${d.state}`, text: d.state }),
+      el("span", {}, d.name, d.reason ? el("div", { class: "reason", text: d.reason }) : null)))
+    : [el("li", { class: "muted", text: "Known once the change type is clear." })]));
+
+  const c = s.context;
+  $("meter-fill").style.width = `${Math.min(100, (100 * c.uncompressed_tool_results) / c.threshold)}%`;
+  $("meter-text").textContent = `${c.uncompressed_tool_results}/${c.threshold} uncompressed tool results` +
+    (c.last_compressed_at ? ` · last compressed ${new Date(c.last_compressed_at).toLocaleTimeString()}` : "");
+}
+
+// --- assignee --------------------------------------------------------------------------------
+
+// The user's name lives only in this browser. The backend says whose move it is; we name them.
+const NAME_KEY = "user-name";
+
+function userName() {
+  try { return localStorage.getItem(NAME_KEY) || ""; } catch { return ""; }
+}
+
+function setUserName(name) {
+  try { localStorage.setItem(NAME_KEY, name.trim()); } catch { /* storage blocked: default name */ }
+  if (state.status) renderAssignee(state.status.assignee);
+}
+
+function renderAssignee(a) {
+  const you = userName() || "You";
+  const label = {
+    agent: "AI Agent",
+    customer: `${you} (The Customer)`,
+    approver: `${you} (The Approver)`,
+    insurer: a.name || "The insurer",
+  }[a.role];
+  $("assignee").textContent = label;
+  $("assignee").className = `assignee-badge ${a.role}`;
+}
+
+window.userName = userName;
+window.setUserName = setUserName;
+
+// --- approval --------------------------------------------------------------------------------
+
+function showApproval(card) {
+  $("approval-summary").textContent = card.summary;
+  const rows = [];
+  if (card.change_type) rows.push(["Change", card.change_type]);
+  if (card.policy) {
+    rows.push(["Policy", `${card.policy.policy_no} · ${card.policy.insurer}`]);
+    rows.push(["Holder now", card.policy.holder_name]);
+    if (card.policy.nominee_name) rows.push(["Nominee now", card.policy.nominee_name]);
+  }
+  for (const [k, v] of Object.entries(card.details)) rows.push([k, short(v, 120)]);
+  for (const [k, v] of Object.entries(card.slots)) rows.push([k, v]);
+  for (const [k, v] of Object.entries(card.waivers)) rows.push([`${k} (waived)`, v]);
+  $("approval-diff").replaceChildren(...rows.map(([k, v]) => el("tr", {}, el("th", { text: k }), el("td", { text: v }))));
+  $("approval-reason").value = "";
+  $("approval").hidden = false;
+  $("approval").scrollIntoView({ behavior: "smooth", block: "nearest" });
+}
+
+async function decide(decision) {
+  const reason = $("approval-reason").value.trim() || null;
+  if (decision !== "approved" && !reason) {
+    $("approval-reason").focus();
+    $("approval-reason").placeholder = "Give a reason first";
+    return;
+  }
+  setBusy(true);
+  try {
+    await api(`/api/sessions/${state.sid}/approval`, { decision, reason });
+    $("approval").hidden = true;
+  } catch (err) {
+    addBubble("error", err.message);
+    setBusy(false);
+  }
+}
+
+// --- trace and replay ------------------------------------------------------------------------
+
+function renderTrace() {
+  const ev = state.events;
+  const results = new Map(ev.filter((e) => e.type === "tool.result").map((e) => [e.call_id, e]));
+  const start = ev[0]?.ts;
+  const rows = [];
+  for (const e of ev) {
+    const at = start ? secs(ms(start, e.ts)) : "";
+    if (e.type === "model.called") {
+      const tok = e.input_tokens != null ? `${e.input_tokens} in · ${e.output_tokens} out` : "–";
+      rows.push(el("tr", {}, el("td", { class: "mono", text: at }), el("td", { text: "model" }),
+        el("td", { text: e.tool_calls ? `${e.tool_calls} tool call(s)` : "reply" }),
+        el("td", { class: "mono", text: secs(e.duration_ms) }), el("td", { class: "mono", text: tok })));
+    } else if (e.type === "tool.called") {
+      const r = results.get(e.call_id);
+      const body = el("details", {}, el("summary", { text: short(e.args, 50) }),
+        el("pre", { text: `args: ${JSON.stringify(e.args, null, 1)}\n\nresult: ${r ? r.content : "(running)"}` }));
+      rows.push(el("tr", {}, el("td", { class: "mono", text: at }), el("td", { class: "mono", text: e.tool }),
+        el("td", {}, body), el("td", { class: "mono", text: r ? secs(ms(e.ts, r.ts)) : "…" }), el("td", { text: "" })));
+    } else if (e.type === "context.compressed") {
+      rows.push(el("tr", {}, el("td", { class: "mono", text: at }), el("td", { text: "compression" }),
+        el("td", { text: `${e.call_ids.join(", ")}: ${e.tokens_before} → ${e.tokens_after} tokens` }), el("td"), el("td")));
+    }
+  }
+  const head = el("tr", {}, ...["At", "Step", "Detail", "Took", "Tokens"].map((h) => el("th", { text: h })));
+  $("trace").replaceChildren(el("thead", {}, head), el("tbody", {}, ...rows));
+  const models = ev.filter((e) => e.type === "model.called");
+  const tokens = models.reduce((n, e) => n + (e.input_tokens || 0) + (e.output_tokens || 0), 0);
+  $("trace-totals").textContent = `${models.length} model calls · ${ev.filter((e) => e.type === "tool.called").length} tool calls · ${tokens} tokens`;
+}
+
+// Replay plays the session's own events back into the chat and activity feed (ADR-0008).
+async function replay() {
+  if (state.replaying || !state.events.length) return;
+  state.replaying = true;
+  selectTab("chat");
+  $("chat").replaceChildren();
+  $("feed").replaceChildren();
+  state.feedRows.clear();
+  state.draft = null;
+  const events = state.events.slice();
+  for (let i = 0; i < events.length; i++) {
+    showEvent(events[i], events);
+    const gap = i + 1 < events.length ? ms(events[i].ts, events[i + 1].ts) : 0;
+    await new Promise((r) => setTimeout(r, Math.min(800, Math.max(60, gap / 4))));
+  }
+  for (const e of state.events.slice(events.length)) showEvent(e, state.events);  // arrived meanwhile
+  state.replaying = false;
+}
+
+// --- context tab -----------------------------------------------------------------------------
+
+async function renderContext() {
+  if (!state.sid) return;
+  const items = await fetch(`/api/sessions/${state.sid}/context`).then((r) => r.json());
+  $("context").replaceChildren(...items.map((it) => {
+    const label = `${it.kind}${it.note ? ` · ${it.note}` : ""}${it.in_prompt ? "" : " · left the prompt"}`;
+    const long = it.text.length > 400 || it.kind === "system";
+    const pre = el("pre", { text: it.text });
+    const body = long ? el("details", {}, el("summary", { text: `${label} (${it.text.length} chars)` }), pre)
+      : el("div", {}, el("strong", { class: "small", text: label }), pre);
+    return el("div", { class: `ctx ${it.in_prompt ? "in" : "out"}` }, body);
+  }));
+}
+
+// --- tabs and wiring -------------------------------------------------------------------------
+
+function selectTab(name) {
+  for (const b of document.querySelectorAll(".tabs button")) b.setAttribute("aria-selected", String(b.dataset.tab === name));
+  for (const t of ["chat", "trace", "context"]) $(`tab-${t}`).hidden = t !== name;
+  if (name === "trace") renderTrace();
+  if (name === "context") renderContext();
+}
+
+document.querySelectorAll(".tabs button").forEach((b) => (b.onclick = () => selectTab(b.dataset.tab)));
+$("composer").addEventListener("submit", send);
+$("text").addEventListener("keydown", (e) => {
+  if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); $("composer").requestSubmit(); }
+});
+$("file-input").addEventListener("change", async (e) => {
+  for (const file of e.target.files) await attach(file.name, file);
+  e.target.value = "";
+});
+$("approval").querySelectorAll("button").forEach((b) => (b.onclick = () => decide(b.dataset.decision)));
+$("new-case").onclick = newSession;
+$("replay").onclick = replay;
+
+loadDemo();
+newSession();

@@ -16,4 +16,5 @@ def chat_model(role: Role) -> AzureChatOpenAI:
         api_version=c.api_version,
         timeout=90,
         max_retries=2,
+        stream_usage=True,  # token counts for the trace view while streaming
     )

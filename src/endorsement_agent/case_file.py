@@ -15,6 +15,7 @@ from endorsement_agent.events import (
     ApprovalDecided,
     ApprovalRequested,
     AskLogged,
+    AssistantMessaged,
     CaseCreated,
     CaseEvent,
     ChangeRequestRecorded,
@@ -29,6 +30,7 @@ from endorsement_agent.events import (
     InsurerResponded,
     InsurerSubmitted,
     InsurerUpdated,
+    ModelCalled,
     PolicySelected,
     PolicySnapshot,
     Requirements,
@@ -36,7 +38,9 @@ from endorsement_agent.events import (
     RulesLoaded,
     SkillLoaded,
     SlotRecorded,
+    ToolCalled,
     ToolResultAdded,
+    UserMessaged,
     ValidationCompleted,
     compressible,
 )
@@ -193,6 +197,8 @@ def apply(case: CaseFile, event: CaseEvent) -> CaseFile:
             c.context.last_compressed_at = event.ts
         case InsurerResponded() | ImageStubbed():
             pass  # audit only: the insurer stage moves on the next status check
+        case UserMessaged() | AssistantMessaged() | ModelCalled() | ToolCalled():
+            pass  # the conversation, for the UI, trace and evals
     return c
 
 

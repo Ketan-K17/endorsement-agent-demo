@@ -13,47 +13,15 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
-from endorsement_agent.config import Limits, fixed_today
-from endorsement_agent.consistency import LLMChecker
-from endorsement_agent.event_store import EventStore
-from endorsement_agent.events import CaseCreated
-from endorsement_agent.graph import Agent, build_graph
-from endorsement_agent.history import LLMCompressor
-from endorsement_agent.llm import chat_model
-from endorsement_agent.mock_world.insurer import MockInsurer
-from endorsement_agent.mock_world.policies import PolicyStore
-from endorsement_agent.mock_world.rules import RulesMaster
-from endorsement_agent.runtime import Runtime, Upload
-from endorsement_agent.skills import SkillLibrary
-from endorsement_agent.tracing import callbacks
-from endorsement_agent.vision import LLMVision
+from endorsement_agent.api import live_agent
+from endorsement_agent.runtime import Upload
 
 
 async def main() -> None:
     load_dotenv()
-    limits = Limits.from_env()
     case_id = f"case-{uuid.uuid4().hex[:8]}"
-    store = EventStore()
-    store.create(
-        CaseCreated(
-            case_id=case_id,
-            ask_budget=limits.ask_budget,
-            compress_threshold=limits.compress_threshold,
-        )
-    )
-    rt = Runtime(
-        case_id=case_id,
-        store=store,
-        policies=PolicyStore.load(),
-        rules=RulesMaster.load(),
-        insurer=MockInsurer(),
-        skills=SkillLibrary(),
-        vision=LLMVision(chat_model("extractor")),
-        checker=LLMChecker(chat_model("judge")),
-        fixed_today=fixed_today(),
-    )
-    graph = build_graph(rt, chat_model("agent"), LLMCompressor(chat_model("compressor")), limits)
-    agent = Agent(rt, graph, callbacks())
+    agent = live_agent(case_id)
+    rt = agent.rt
     print(f"{case_id} — type a message; empty line to quit.")
     pending: list[Upload] = []
     while text := input("you> ").strip():
