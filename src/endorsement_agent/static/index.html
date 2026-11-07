@@ -43,8 +43,8 @@
       <p class="kicker">Hat #1</p>
       <h2>The customer 🧢</h2>
       <ol class="steps">
-        <li><strong>Pick a demo case.</strong> It drafts your message and attaches the documents.</li>
-        <li><strong>Hit send</strong> and answer the agent's questions, like a real policyholder would.</li>
+        <li><strong>Pick a demo case.</strong> It drafts your opening message and lays the case's documents out in a dock.</li>
+        <li><strong>Hit send</strong>, drag documents in whenever (and in whatever order) you like, and answer the agent's questions, like a real policyholder would.</li>
         <li><strong>Feel free to be difficult.</strong> Change your mind or contradict a document. It should cope.</li>
       </ol>
     </section>
@@ -96,6 +96,79 @@
     </footer>
   </dialog>
 
+  <dialog id="hooray" class="intro" aria-labelledby="hooray-title">
+    <button type="button" class="intro-skip" data-go="skip">Maybe later</button>
+
+    <section class="slide" data-next="What just happened?">
+      <div class="scene burst" data-figure="cheer"></div>
+      <p class="kicker">Signed, sealed, delivered</p>
+      <h2 id="hooray-title">It's off to <span class="squiggle" data-fill="insurer"></span>! 🎉</h2>
+      <p>Lovely approving<span data-fill="you"></span>. The endorsement is with the insurer under reference
+        <code class="ref" data-fill="ref"></code>.</p>
+      <p class="muted small">Fun fact: the agent physically can't call <code>submit_to_insurer</code> without your
+        approval. That's enforced in code, not good manners.</p>
+    </section>
+
+    <section class="slide" data-next="Show me the receipts" hidden>
+      <div class="scene split" data-figure="tip">
+        <div class="relay" aria-hidden="true">
+          <span class="assignee-badge agent">AI Agent</span>
+          <span class="assignee-badge approver">You (The Approver)</span>
+          <span class="assignee-badge insurer" data-fill="insurer"></span>
+        </div>
+      </div>
+      <p class="kicker">Hats off</p>
+      <h2>The ball's in <span data-fill="insurer"></span>'s court</h2>
+      <p>Glance at the <strong>Status</strong> panel on the right:</p>
+      <ol class="steps">
+        <li><strong>Assignee</strong> has quietly changed from you to <strong data-fill="insurer"></strong>.
+          Like a ticket, it always says whose move it is.</li>
+        <li><strong>Stages</strong> have marched on to <em>Insurer</em>, and the <strong>Insurer</strong> row shows
+          the reference.</li>
+        <li><strong>Activity</strong> lists every call, ending with <code>submit_to_insurer</code>.</li>
+      </ol>
+      <p class="muted small">None of it is stored. The status bar is rebuilt from the case file on every model
+        call, like a fresh sticky note each time.</p>
+    </section>
+
+    <section class="slide" data-next="And the brain?" hidden>
+      <p class="kicker">The paper trail</p>
+      <h2>Trace and replay 🧾</h2>
+      <p>Everything the agent did was written down as events. Open the <strong>Trace</strong> tab:</p>
+      <ol class="steps">
+        <li><strong>Each row</strong> is a model call or a tool call, with when it started, how long it took and
+          what it cost in tokens.</li>
+        <li><strong>Click a tool row</strong> to unfold its arguments and its result. Find
+          <code>record_slot</code> to see a field being filled, or <code>submit_to_insurer</code> for the grand finale.</li>
+        <li><strong>Replay this session</strong> plays those same events back into the chat at fast-forward speed.
+          Nothing is re-run and no model is called; it's the tape, not a remake.</li>
+      </ol>
+    </section>
+
+    <section class="slide" data-next="Show me the context" hidden>
+      <p class="kicker">Inside its head</p>
+      <h2>What the model actually saw 🧠</h2>
+      <p>The <strong>Context</strong> tab lists every message the model was shown, in order.</p>
+      <div class="peek">
+        <div><span class="mini-ctx" aria-hidden="true"><i class="in"></i><i class="in"></i><i class="in"></i></span>
+          <strong>Top</strong><span>The system prompt: role, guidelines and the whole SOP. Open it if you're curious.</span></div>
+        <div><span class="mini-ctx" aria-hidden="true"><i class="in"></i><i class="in"></i><i class="out"></i></span>
+          <strong>Green</strong><span>Still in the prompt. The chat, tool results, skills it loaded.</span></div>
+        <div><span class="mini-ctx" aria-hidden="true"><i class="out"></i><i class="out"></i><i class="out"></i></span>
+          <strong>Faded</strong><span>Left the prompt, with the original kept on file.</span></div>
+      </div>
+      <p>Things fade for good reasons: old <strong>status bars</strong> (only the newest counts), <strong>tool
+        results</strong> compressed once five piled up, and <strong>document images</strong> swapped for a note once
+        read. History is never cut, only tidied.</p>
+    </section>
+
+    <footer class="intro-nav">
+      <button type="button" class="ghost" data-go="back">Back</button>
+      <div class="intro-dots"></div>
+      <button type="button" data-go="next">What just happened?</button>
+    </footer>
+  </dialog>
+
   <nav class="tabs" role="tablist">
     <button role="tab" data-tab="chat" aria-selected="true">Chat</button>
     <button role="tab" data-tab="trace" aria-selected="false">Trace</button>
@@ -103,6 +176,12 @@
   </nav>
 
   <div class="layout">
+    <section id="dock" class="dock" hidden aria-labelledby="dock-title">
+      <h2 id="dock-title">Your documents</h2>
+      <p class="muted small">Drag one into the message box, or click to add it.</p>
+      <ul id="dock-docs" class="dock-docs"></ul>
+    </section>
+
     <main>
       <section id="tab-chat" class="tab" role="tabpanel">
         <details id="demo" class="demo" open>

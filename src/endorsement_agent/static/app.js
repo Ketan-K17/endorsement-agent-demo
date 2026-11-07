@@ -12,10 +12,13 @@ const state = {
   lastSeq: 0,
   draft: null,          // the assistant bubble receiving tokens
   feedRows: new Map(),  // call_id -> feed row
-  attachments: [],      // {filename, mime, data (base64)}
+  attachments: [],      // {filename, mime, data (base64), dock (doc name if it came from the dock)}
+  dock: null,           // {caseId, docs: [{name, sent}]}: the demo case's documents, added at will
   busy: false,
   replaying: false,
   status: null,         // the last status bar, so a name change can re-render the assignee
+  submitted: null,      // insurer ref just submitted, celebrated when the turn settles
+  insurer: null,        // the insurer named on the last approval card
 };
 
 // --- helpers ---------------------------------------------------------------------------------
@@ -76,8 +79,10 @@ function scrollDown(node) { node.scrollTop = node.scrollHeight; }
 
 async function newSession() {
   if (state.source) state.source.close();
-  Object.assign(state, { events: [], lastSeq: 0, draft: null, busy: false, attachments: [] });
+  Object.assign(state, { events: [], lastSeq: 0, draft: null, busy: false, attachments: [], submitted: null });
   state.feedRows.clear();
+  if (state.dock) for (const d of state.dock.docs) d.sent = false;  // a new case has seen none of them
+  renderDock();
   for (const id of ["chat", "feed", "trace", "context"]) $(id).replaceChildren();
   $("approval").hidden = true;
   renderAttachments();
@@ -102,6 +107,7 @@ function onCaseEvent(e) {
   if (e.seq <= state.lastSeq) return;  // a reconnect may resend
   state.lastSeq = e.seq;
   state.events.push(e);
+  if (e.type === "insurer.submitted") state.submitted = e.ref;
   if (!state.replaying) showEvent(e, state.events);
   if (!$("tab-trace").hidden) renderTrace();
 }
@@ -192,7 +198,13 @@ async function send(event) {
   if (!text || state.busy) return;
   setBusy(true);
   try {
-    await api(`/api/sessions/${state.sid}/messages`, { text, files: state.attachments });
+    const files = state.attachments.map(({ filename, mime, data }) => ({ filename, mime, data }));
+    await api(`/api/sessions/${state.sid}/messages`, { text, files });
+    for (const a of state.attachments) {
+      const doc = state.dock?.docs.find((d) => d.name === a.dock);
+      if (doc) doc.sent = true;
+    }
+    renderDock();
     $("text").value = "";
     state.attachments = [];
     renderAttachments();
@@ -214,10 +226,64 @@ function toBase64(blob) {
   });
 }
 
-async function attach(filename, blob) {
+async function attach(filename, blob, dock = null) {
   const mime = blob.type === "image/jpeg" ? "image/jpeg" : "image/png";
-  state.attachments.push({ filename, mime, data: await toBase64(blob) });
+  state.attachments.push({ filename, mime, data: await toBase64(blob), dock });
   renderAttachments();
+}
+
+// --- document dock ---------------------------------------------------------------------------
+
+// A demo case only drafts the opening message. Its documents wait in the dock, so the user
+// decides when, and in what order, the agent sees them. Re-sending one is allowed on purpose.
+const DOC_TYPE = "application/x-dock-doc";
+const fixtureUrl = (name) => `/fixtures/${state.dock.caseId}/${name}`;
+
+async function attachFromDock(name) {
+  const blob = await fetch(fixtureUrl(name)).then((r) => r.blob());
+  await attach(name, blob, name);
+  $("text").focus();
+}
+
+function renderDock() {
+  $("dock").hidden = !state.dock;
+  document.querySelector(".layout").classList.toggle("with-dock", Boolean(state.dock));
+  if (!state.dock) return;
+  $("dock-docs").replaceChildren(...state.dock.docs.map((d) => {
+    const item = el("li", {
+      class: `dock-doc${d.sent ? " sent" : ""}`, draggable: "true", tabindex: "0", role: "button",
+      title: d.sent ? "Already sent to the agent. You can send it again." : "Drag into the message box, or click to add",
+    },
+      el("img", { src: fixtureUrl(d.name), alt: "", loading: "lazy" }),
+      el("span", { class: "dock-name", text: d.name }),
+      d.sent ? el("span", { class: "dock-sent", text: "✓ sent" }) : null);
+    item.addEventListener("dragstart", (e) => {
+      e.dataTransfer.setData(DOC_TYPE, d.name);
+      e.dataTransfer.effectAllowed = "copy";
+    });
+    item.onclick = () => attachFromDock(d.name);
+    item.onkeydown = (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); attachFromDock(d.name); } };
+    return item;
+  }));
+}
+
+function wireDrop(zone) {
+  const accepts = (e) => e.dataTransfer.types.includes(DOC_TYPE) || e.dataTransfer.types.includes("Files");
+  zone.addEventListener("dragover", (e) => {
+    if (!accepts(e)) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "copy";
+    zone.classList.add("drop-target");
+  });
+  zone.addEventListener("dragleave", (e) => { if (!zone.contains(e.relatedTarget)) zone.classList.remove("drop-target"); });
+  zone.addEventListener("drop", async (e) => {
+    if (!accepts(e)) return;
+    e.preventDefault();
+    zone.classList.remove("drop-target");
+    const name = e.dataTransfer.getData(DOC_TYPE);
+    if (name && state.dock) return attachFromDock(name);
+    for (const file of e.dataTransfer.files) if (/^image\/(png|jpeg)$/.test(file.type)) await attach(file.name, file);
+  });
 }
 
 function renderAttachments() {
@@ -232,15 +298,12 @@ async function loadDemo() {
   const demo = await fetch("/api/demo").then((r) => r.json());
   $("demo-cases").replaceChildren(...demo.cases.map((c) => {
     const use = el("button", { type: "button", class: "ghost", text: `Use (${c.docs.length} docs)` });
-    use.onclick = async () => {
-      use.disabled = true;
+    use.onclick = () => {
       state.attachments = [];
-      for (const doc of c.docs) {
-        const blob = await fetch(`/fixtures/${c.id}/${doc}`).then((r) => r.blob());
-        await attach(doc, blob);
-      }
+      renderAttachments();
+      state.dock = { caseId: c.id, docs: c.docs.map((name) => ({ name, sent: false })) };
+      renderDock();
       $("text").value = c.starter;
-      use.disabled = false;
       $("text").focus();
     };
     return el("div", { class: "demo-case" }, el("strong", { text: c.title }), el("p", { text: c.starter }), use);
@@ -268,6 +331,10 @@ function renderStatus(s) {
   $("activity").textContent = s.current_activity;
   $("activity").className = `activity${busy ? " busy" : ""}`;
   setBusy(busy);
+  if (state.submitted && !busy) {
+    window.celebrateSubmission?.({ insurer: s.assignee.name || state.insurer, ref: state.submitted });
+    state.submitted = null;
+  }
 
   const t = s.trace_view;
   const fields = [
@@ -326,6 +393,7 @@ window.setUserName = setUserName;
 
 function showApproval(card) {
   $("approval-summary").textContent = card.summary;
+  state.insurer = card.policy?.insurer || null;
   const rows = [];
   if (card.change_type) rows.push(["Change", card.change_type]);
   if (card.policy) {
@@ -434,6 +502,8 @@ function selectTab(name) {
   if (name === "context") renderContext();
 }
 
+window.selectTab = selectTab;
+
 document.querySelectorAll(".tabs button").forEach((b) => (b.onclick = () => selectTab(b.dataset.tab)));
 $("composer").addEventListener("submit", send);
 $("text").addEventListener("keydown", (e) => {
@@ -443,6 +513,7 @@ $("file-input").addEventListener("change", async (e) => {
   for (const file of e.target.files) await attach(file.name, file);
   e.target.value = "";
 });
+wireDrop($("composer"));
 $("approval").querySelectorAll("button").forEach((b) => (b.onclick = () => decide(b.dataset.decision)));
 $("new-case").onclick = newSession;
 $("replay").onclick = replay;

@@ -47,22 +47,22 @@ STATIC = Path(__file__).parent / "static"
 FIXTURES = Path(__file__).parents[2] / "fixtures" / "documents"
 MAX_FILE_BYTES = 8 * 1024 * 1024
 
-# Starter messages for the fixture cases in the "Demo policies" picker (DESIGN §13).
+# Starter messages for the fixture cases in the "Demo policies" picker (DESIGN §13). They carry
+# no documents; the UI puts the case's files in a dock for the user to add when they choose.
 DEMO_CASES = {
     "case_01_owner_transfer_clean": (
         "Change of owner",
         "Hi, I bought a used Maruti Swift, KA05MZ4182, and want its insurance moved to my "
-        "name. My documents are attached.",
+        "name.",
     ),
     "case_03_nominee_update": (
         "Nominee update",
         "Hello, please change the nominee on my policy HLA/MC/88104577 to my daughter, "
-        "Divya Narayanan. My documents are attached.",
+        "Divya Narayanan.",
     ),
     "case_05_name_typo": (
         "Name correction",
-        "My name is misspelt on policy CDM-PV-5529417. It should be Jignesh Patel. "
-        "Attaching my RC and PAN.",
+        "My name is misspelt on policy CDM-PV-5529417. It should be Jignesh Patel.",
     ),
 }
 

@@ -125,8 +125,9 @@ th { color: var(--muted); font-weight: 600; }
   max-width: 1280px;
   margin: 0 auto;
 }
+.layout.with-dock { grid-template-columns: 180px minmax(0, 1fr) 340px; max-width: 1480px; }
 @media (max-width: 900px) {
-  .layout { grid-template-columns: minmax(0, 1fr); }
+  .layout, .layout.with-dock { grid-template-columns: minmax(0, 1fr); }
   .top { flex-direction: column; align-items: flex-start; }
 }
 
@@ -165,6 +166,26 @@ aside { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
 .attachments { display: flex; flex-wrap: wrap; gap: 0.3rem; margin-bottom: 0.4rem; }
 .chip { display: inline-flex; gap: 0.3rem; align-items: center; font-size: 0.75rem; padding: 0.15rem 0.5rem; border-radius: 999px; background: var(--surface-2); border: 1px solid var(--border); }
 .chip button { padding: 0 0.2rem; border: none; background: none; color: var(--muted); }
+
+.composer.drop-target { outline: 2px dashed var(--accent); outline-offset: 4px; border-radius: var(--radius); }
+
+/* document dock */
+.dock { align-self: start; position: sticky; top: 12px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px; min-width: 0; }
+.dock h2 { margin-bottom: 0.2rem; }
+.dock p { margin: 0 0 0.6rem; }
+.dock-docs { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 0.5rem; }
+.dock-doc { position: relative; display: flex; flex-direction: column; gap: 0.25rem; padding: 0.4rem; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface-2); cursor: grab; font-size: 0.75rem; }
+.dock-doc:hover, .dock-doc:focus-visible { border-color: var(--accent); outline: none; }
+.dock-doc:active { cursor: grabbing; }
+.dock-doc img { width: 100%; height: 64px; object-fit: cover; object-position: top; border-radius: 4px; background: var(--surface); pointer-events: none; }
+.dock-name { font-family: var(--mono); overflow-wrap: anywhere; }
+.dock-doc.sent img { opacity: 0.55; }
+.dock-sent { position: absolute; top: 0.6rem; right: 0.6rem; font-size: 0.68rem; font-weight: 600; padding: 0 0.4rem; border-radius: 999px; background: var(--ok-bg); color: var(--ok); }
+@media (max-width: 900px) {
+  .dock { position: static; }
+  .dock-docs { flex-direction: row; overflow-x: auto; }
+  .dock-doc { flex: 0 0 120px; }
+}
 
 .approval { border: 1px solid var(--warn); background: var(--warn-bg); border-radius: var(--radius); padding: 0.8rem; margin-top: 0.6rem; }
 .approval textarea { margin: 0.6rem 0; }
@@ -338,6 +359,21 @@ aside { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
 .intro-dots button[aria-current="true"] { width: 24px; background: var(--accent); }
 .intro-nav [data-go="next"] { min-width: 8.5rem; }
 
+/* celebration, once the case is with the insurer */
+.scene.burst { position: relative; }
+.scene .confetti { position: absolute; z-index: 1; font-size: 16px; }
+.envelope { fill: var(--surface); stroke: var(--accent); stroke-width: 2; }
+.envelope-flap { fill: none; stroke: var(--accent); stroke-width: 2; stroke-linejoin: round; }
+.send-off, .tip { transform-box: fill-box; transform-origin: center; }
+.send-off { animation: send-off 3s 0.4s ease-in infinite; }
+.tip { transform-origin: 20% 100%; animation: tip 2.6s ease-in-out infinite; }
+.ref { font-weight: 700; padding: 1px 6px; border-radius: 6px; background: var(--ok-bg); color: var(--ok); }
+.relay { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; font-size: 0.78rem; }
+.relay .assignee-badge { opacity: 0; animation: pop-in 0.35s forwards; }
+.relay .assignee-badge:nth-child(1) { animation-delay: 0.2s; }
+.relay .assignee-badge:nth-child(2) { animation-delay: 0.9s; margin-left: 16px; }
+.relay .assignee-badge:nth-child(3) { animation-delay: 1.6s; margin-left: 32px; box-shadow: 0 0 0 2px var(--ok); }
+
 @media (max-width: 520px) {
   .scene.split .figure { height: 120px; }
   .mini-chat, .mini-card { width: 170px; }
@@ -367,6 +403,8 @@ aside { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
 @keyframes light { 0%, 4% { background: var(--border); } 10%, 80% { background: var(--accent); } 90%, 100% { background: var(--border); } }
 @keyframes grow { from { transform: scaleX(0.4); } to { transform: scaleX(1); } }
 @keyframes fade-out { from { opacity: 1; } to { opacity: 0.25; } }
+@keyframes send-off { 0%, 20% { transform: none; opacity: 1; } 28% { transform: translate(-4px, 4px) rotate(-6deg); } 70%, 100% { transform: translate(150px, -170px) rotate(28deg); opacity: 0; } }
+@keyframes tip { 0%, 55%, 100% { transform: none; } 70%, 85% { transform: translateY(-16px) rotate(-16deg); } }
 @keyframes confetti { to { transform: translate(var(--dx), var(--dy)) rotate(var(--spin)); opacity: 0; } }
 
 @media (prefers-reduced-motion: reduce) {
