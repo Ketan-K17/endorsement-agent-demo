@@ -63,7 +63,7 @@ Update this block when a step finishes.
 - [ ] 5d. Revisit cases in a sitting and survive reloads (ADR-0022): `?case=` URL, header case picker; awaiting a browser check by the user
 - [ ] 5e. Documents in parts (ADR-0023): Aadhaar front/back, policy copy both pages enforced; handover moves the assignee to the team. Unit-tested; awaiting a live check by the user
 - [ ] 6. Evals + nightly runs
-- [ ] 7. Deploy to Hugging Face Spaces with limits (needs credentials sign-off)
+- [ ] 7. Deploy to Render with limits (ADR-0024; needs credentials sign-off)
 
 ## Waiting on the user
 
