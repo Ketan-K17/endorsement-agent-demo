@@ -176,7 +176,7 @@ Templates and any production source stay in a local stash that is never committe
 
 ## 14. UI
 
-Single static page: chat pane, status bar, approval card, live activity feed (tool events with timings), in-app trace/replay view, and a **Context tab**: the full message log with items still in the current prompt in green and items that have left it (old status bars, compressed originals, stubbed images) kept visible in red. Tokens stream over SSE; the status bar updates after each tool result and at the end of each turn, never mid-token. A static Context page is acceptable if the animated version proves costly.
+Single static page in the Case Desk style (ADR-0021): chat pad with inline tool notes, status bar, approval card, a flight recorder of steps with timings, in-app trace/replay view, and a **Context tab**: the full message log, coloured by kind, with items that have left the current prompt (old status bars, compressed originals, stubbed images) kept visible but faded. Tokens stream over SSE; the status bar updates after each tool result and at the end of each turn, never mid-token. A static Context page is acceptable if the animated version proves costly.
 
 ## 15. Latency, limits and abuse controls
 

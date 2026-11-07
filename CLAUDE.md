@@ -59,6 +59,7 @@ Update this block when a step finishes.
 - [x] 4. Extraction against fixture documents (cases 01, 03, 05; ADR-0016) + `validate_case` LLM pass (ADR-0017). Check with `tools/extract_fixtures.py`
 - [ ] 5. API + SSE + UI (ADR-0018; backend live-checked on case 05; UI awaiting a browser check by the user). Run with `uv run uvicorn endorsement_agent.api:create_app --factory --port 7860`
 - [ ] 5b. Agent Documentation tab for tools/skills (ADR-0020); awaiting a browser check by the user
+- [ ] 5c. Case Desk UI restyle (ADR-0021): ruled chat pad, flight recorder, in-tray, case file; awaiting a browser check by the user
 - [ ] 6. Evals + nightly runs
 - [ ] 7. Deploy to Hugging Face Spaces with limits (needs credentials sign-off)
 
