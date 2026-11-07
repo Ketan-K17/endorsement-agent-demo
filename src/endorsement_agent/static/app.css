@@ -341,6 +341,7 @@ main { min-width: 0; }
 .tag strong { font-family: var(--display); font-size: 1rem; }
 .tag strong.approver { color: var(--stamp); }
 .tag strong.insurer { color: var(--ok); }
+.tag strong.team { color: var(--warn); }
 
 .sheetbox { padding: 12px 14px; }
 .sheetbox h3:first-child { margin-top: 0; }
@@ -359,7 +360,7 @@ main { min-width: 0; }
 .state { flex: none; align-self: flex-start; font: 700 0.66rem var(--type); text-transform: uppercase; letter-spacing: 0.06em; border: 1.5px solid currentColor; border-radius: 3px; padding: 0 4px; rotate: -2deg; }
 .state.accepted { color: var(--ok); }
 .state.waived, .state.received { color: var(--muted); }
-.state.missing { color: var(--warn); }
+.state.missing, .state.partial { color: var(--warn); }
 .state.rejected { color: var(--stamp); }
 .pips { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 0.25rem; }
 .pips i { width: 18px; height: 10px; border: 1.5px solid var(--ink-soft); border-radius: 2px; }

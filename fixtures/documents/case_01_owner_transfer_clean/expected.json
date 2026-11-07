@@ -2,6 +2,9 @@
   "policy_copy.png": {
     "doc_type": "policy_copy",
     "quality": "ok",
+    "parts": [
+      "page_1"
+    ],
     "fields": {
       "policy_no": "NWG-MOT-240117",
       "reg_no": "KA05MZ4182",
@@ -14,6 +17,9 @@
   "policy_copy_p2.png": {
     "doc_type": "policy_copy",
     "quality": "ok",
+    "parts": [
+      "page_2"
+    ],
     "fields": {
       "nominee_name": "Sunanda Kulkarni",
       "nominee_relation": "Spouse",
@@ -45,6 +51,9 @@
   "aadhaar_front.png": {
     "doc_type": "aadhaar",
     "quality": "ok",
+    "parts": [
+      "front"
+    ],
     "fields": {
       "name": "Meera Shetty",
       "dob": "22/07/1991",
@@ -54,6 +63,9 @@
   "aadhaar_back.png": {
     "doc_type": "aadhaar",
     "quality": "ok",
+    "parts": [
+      "back"
+    ],
     "fields": {
       "aadhaar_no": "481527390164",
       "address": "D/O Prakash Shetty, 22, Lakeview Layout, Mysuru, Karnataka 570008"

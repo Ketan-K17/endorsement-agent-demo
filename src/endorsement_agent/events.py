@@ -38,6 +38,7 @@ class PolicySnapshot(BaseModel):
 class DocRequirement(BaseModel):
     name: str
     condition: str | None = None
+    parts: list[str] = Field(default_factory=list)  # all must be covered (ADR-0023)
 
 
 class SlotRequirement(BaseModel):
@@ -111,6 +112,7 @@ class DocumentClassified(_Event):
     doc_id: str
     doc_type: str
     quality: Literal["ok", "poor", "unreadable"]
+    parts: list[str] = Field(default_factory=list)  # e.g. ["front"]; empty for one-part types
 
 
 class DocumentExtracted(_Event):

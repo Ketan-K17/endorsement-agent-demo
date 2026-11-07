@@ -61,6 +61,7 @@ Update this block when a step finishes.
 - [ ] 5b. Agent Documentation tab for tools/skills (ADR-0020); awaiting a browser check by the user
 - [ ] 5c. Case Desk UI restyle (ADR-0021): ruled chat pad, flight recorder, in-tray, case file; awaiting a browser check by the user
 - [ ] 5d. Revisit cases in a sitting and survive reloads (ADR-0022): `?case=` URL, header case picker; awaiting a browser check by the user
+- [ ] 5e. Documents in parts (ADR-0023): Aadhaar front/back, policy copy both pages enforced; handover moves the assignee to the team. Unit-tested; awaiting a live check by the user
 - [ ] 6. Evals + nightly runs
 - [ ] 7. Deploy to Hugging Face Spaces with limits (needs credentials sign-off)
 

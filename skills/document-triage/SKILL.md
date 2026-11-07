@@ -6,6 +6,7 @@ tools_hint: [list_documents, classify_document, extract_fields]
 # Document triage
 
 - Classify every new upload in parallel, then extract in parallel.
+- A document in parts (Aadhaar front/back, policy copy pages) stays `partial` until every part is accepted; ask for the missing part by name.
 - Wrong type: say what it looks like and what is still needed. Never relabel it.
 - Poor or unreadable: name the problem (blur, glare, cropped) and ask for one clearer copy.
 - Never record ID numbers (Aadhaar, PAN) as values; names and dates only.

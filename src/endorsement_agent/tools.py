@@ -38,6 +38,7 @@ from endorsement_agent.events import (
 )
 from endorsement_agent.runtime import Runtime, VisionError
 from endorsement_agent.skills import SkillLibrary
+from endorsement_agent.status import docs_checklist
 from endorsement_agent.validation import compare, diff, issues, verdict_is_current
 
 APPROVAL_TOOL = "request_approval"
@@ -295,10 +296,12 @@ async def classify_document(rt: Runtime, a: DocArgs) -> str:
     if upload is None:
         raise ToolRefused(f"unknown document {a.doc_id}")
     try:
-        c = await rt.vision.classify(upload, rt.rules.doc_types)
+        c = await rt.vision.classify(upload, rt.rules.doc_types, rt.rules.doc_parts)
     except VisionError as e:
         raise ToolRefused(f"could not classify {a.doc_id}: {e}") from None
-    rt.emit(DocumentClassified(doc_id=a.doc_id, doc_type=c.doc_type, quality=c.quality))
+    rt.emit(
+        DocumentClassified(doc_id=a.doc_id, doc_type=c.doc_type, quality=c.quality, parts=c.parts)
+    )
     if c.quality != "ok":
         reason = f"{c.quality} image" + (f": {c.note}" if c.note else "")
         rt.emit(DocumentReviewed(doc_id=a.doc_id, verdict="rejected", reason=reason))
@@ -332,8 +335,11 @@ async def extract_fields(rt: Runtime, a: ExtractArgs) -> str:
     rt.emit(DocumentExtracted(doc_id=a.doc_id, fields=fields))
     required = {r.name for r in case.requirements.docs} if case.requirements else set()
     if doc.quality == "ok" and doc.verdict is None and doc.type in required:
-        rt.emit(DocumentReviewed(doc_id=a.doc_id, verdict="accepted"))
+        case = rt.emit(DocumentReviewed(doc_id=a.doc_id, verdict="accepted"))
         status = "accepted"
+        check = next(c for c in docs_checklist(case) if c.name == doc.type)
+        if check.state == "partial":
+            status += f"; {doc.type} still {check.reason}"
     elif doc.type not in required:
         status = f"not accepted: {doc.type} is not a required document for this case"
     else:

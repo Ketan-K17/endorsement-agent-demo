@@ -80,7 +80,9 @@ class FakeVision:
         self.types: dict[str, Classification] = {}
         self.fields: dict[str, dict[str, ExtractedField]] = {}
 
-    async def classify(self, upload: Upload, doc_types: list[str]) -> Classification:
+    async def classify(
+        self, upload: Upload, doc_types: list[str], doc_parts: dict[str, list[str]]
+    ) -> Classification:
         return self.types[upload.doc_id]
 
     async def extract(

@@ -46,10 +46,10 @@ FIELDS: dict[str, list[str]] = {
 }
 
 
-async def read(vision: LLMVision, path: Path, doc_types: list[str]) -> dict[str, object]:
+async def read(vision: LLMVision, path: Path, rules: RulesMaster) -> dict[str, object]:
     upload = Upload(doc_id=path.stem, filename=path.name, mime="image/png", data=path.read_bytes())
     try:
-        c = await vision.classify(upload, doc_types)
+        c = await vision.classify(upload, rules.doc_types, rules.doc_parts)
         fields = FIELDS.get(c.doc_type, [])
         got = await vision.extract(upload, c.doc_type, fields) if fields else {}
     except VisionError as e:
@@ -57,6 +57,7 @@ async def read(vision: LLMVision, path: Path, doc_types: list[str]) -> dict[str,
     return {
         "doc_type": c.doc_type,
         "quality": c.quality,
+        "parts": c.parts,
         "note": c.note,
         "fields": {k: v.model_dump() for k, v in got.items()},
     }
@@ -65,7 +66,7 @@ async def read(vision: LLMVision, path: Path, doc_types: list[str]) -> dict[str,
 def diffs(name: str, got: dict[str, object], want: dict[str, object]) -> list[str]:
     out = [
         f"{name}: {key} is {got.get(key)!r}, expected {want[key]!r}"
-        for key in ("doc_type", "quality")
+        for key in ("doc_type", "quality", "parts")
         if key in want and got.get(key) != want[key]
     ]
     fields = got.get("fields")
@@ -82,9 +83,9 @@ def diffs(name: str, got: dict[str, object], want: dict[str, object]) -> list[st
     return out
 
 
-async def run_case(vision: LLMVision, case: Path, doc_types: list[str], out: Path | None) -> int:
+async def run_case(vision: LLMVision, case: Path, rules: RulesMaster, out: Path | None) -> int:
     paths = sorted(case.glob("*.png"))
-    results = await asyncio.gather(*(read(vision, p, doc_types) for p in paths))
+    results = await asyncio.gather(*(read(vision, p, rules) for p in paths))
     got = {p.name: r for p, r in zip(paths, results, strict=True)}
     if out:
         out.mkdir(parents=True, exist_ok=True)
@@ -105,12 +106,12 @@ async def main() -> int:
     args = parser.parse_args()
     load_dotenv()
     vision = LLMVision(chat_model("extractor"))
-    doc_types = RulesMaster.load().doc_types
+    rules = RulesMaster.load()
     cases = [ROOT / c for c in args.cases] or [d for d in sorted(ROOT.iterdir()) if d.is_dir()]
     total = 0
     for case in cases:
         if any(case.glob("*.png")):
-            total += await run_case(vision, case, doc_types, args.out)
+            total += await run_case(vision, case, rules, args.out)
     return 1 if total else 0
 
 

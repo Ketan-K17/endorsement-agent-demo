@@ -2,6 +2,9 @@
   "policy_copy.png": {
     "doc_type": "policy_copy",
     "quality": "ok",
+    "parts": [
+      "page_1"
+    ],
     "fields": {
       "policy_no": "CDM-PV-5529417",
       "reg_no": "GJ01RT8840",
@@ -14,6 +17,9 @@
   "policy_copy_p2.png": {
     "doc_type": "policy_copy",
     "quality": "ok",
+    "parts": [
+      "page_2"
+    ],
     "fields": {
       "nominee_name": null,
       "nominee_relation": null,

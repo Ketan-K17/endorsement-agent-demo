@@ -63,8 +63,8 @@ def current_activity(events: Sequence[CaseEvent], busy: bool, awaiting_approval:
 
 
 class Assignee(BaseModel):
-    role: Literal["agent", "customer", "approver", "insurer"]
-    name: str | None = None  # the insurer's name; the UI names the customer and approver
+    role: Literal["agent", "customer", "approver", "insurer", "team"]
+    name: str | None = None  # the insurer or team; the UI names the customer and approver
 
 
 _WITH_INSURER = ("submitted", "received", "approved")
@@ -76,6 +76,8 @@ def assignee(case: CaseFile, busy: bool, awaiting_approval: bool) -> Assignee:
         return Assignee(role="approver")
     if busy:
         return Assignee(role="agent")
+    if case.handover is not None:
+        return Assignee(role="team", name=case.handover.team)
     if case.insurer.stage in _WITH_INSURER:
         return Assignee(role="insurer", name=case.policy.insurer if case.policy else None)
     return Assignee(role="customer")

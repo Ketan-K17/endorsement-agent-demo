@@ -26,6 +26,15 @@ _CLASSIFY = (
     "Give its quality: ok if the text can be read; poor if blurred, cropped, rotated or under "
     "glare so that part of it is hard to read; unreadable if the text cannot be read. "
     "When quality is not ok, say what is wrong in the note, in a few words."
+    "{parts}"
+)
+
+_PARTS = (
+    "\nSome types come in parts: {listed}. List the parts this image shows, more than one if "
+    "it shows several. An Aadhaar front has the photo, name and date of birth; the back has "
+    "the address. A policy copy's page_1 has the policy, holder and vehicle details; page_2 "
+    "has the premium and nominee details; printed page numbers win where shown. For other "
+    "types, parts is empty."
 )
 
 _EXTRACT = (
@@ -43,6 +52,7 @@ _EMPTY = {"", "NA", "NIL", "NONE", "NOTAPPLICABLE"}
 class _Classified(BaseModel):
     doc_type: str
     quality: Literal["ok", "poor", "unreadable"]
+    parts: list[str]
     note: str | None
 
 
@@ -74,11 +84,18 @@ class LLMVision:
             # The exception type only: messages can echo the request.
             raise VisionError(f"the model call failed ({type(e).__name__})") from None
 
-    async def classify(self, upload: Upload, doc_types: list[str]) -> Classification:
-        system = _CLASSIFY.format(types=", ".join(doc_types))
+    async def classify(
+        self, upload: Upload, doc_types: list[str], doc_parts: dict[str, list[str]]
+    ) -> Classification:
+        listed = "; ".join(f"{t}: {', '.join(ps)}" for t, ps in doc_parts.items())
+        system = _CLASSIFY.format(
+            types=", ".join(doc_types), parts=_PARTS.format(listed=listed) if listed else ""
+        )
         c = cast(_Classified, await self._ask(_Classified, system, upload))
         doc_type = c.doc_type if c.doc_type in doc_types else "other"
-        return Classification(doc_type=doc_type, quality=c.quality, note=c.note)
+        # Only the type's own parts, in its order: a stray label never covers a part.
+        parts = [p for p in doc_parts.get(doc_type, []) if p in c.parts]
+        return Classification(doc_type=doc_type, quality=c.quality, parts=parts, note=c.note)
 
     async def extract(
         self, upload: Upload, doc_type: str, fields: list[str]

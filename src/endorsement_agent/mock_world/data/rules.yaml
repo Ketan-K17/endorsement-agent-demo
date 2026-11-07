@@ -5,6 +5,8 @@
 # without cannot. note: guidance shown to the agent, never enforced.
 
 doc_types: [policy_copy, rc, aadhaar, pan, transfer_form, noc, inspection_report, nominee_id, name_change_proof]
+# Parts every copy of a type must cover, usually one upload each (ADR-0023). Enforced.
+doc_parts: {aadhaar: [front, back], policy_copy: [page_1, page_2]}
 
 terms:
   - {type: change-of-owner, insurer: Northwind General, fee_inr: 150, tat_days: 3, handover_if: ["policy is lapsed", "seller on the RC is not the policyholder"]}
@@ -21,7 +23,7 @@ rows:
   # change-of-owner
   - {type: change-of-owner, insurer: Northwind General, item: rc, mode: upload, note: "RC already transferred, in the new owner's name"}
   - {type: change-of-owner, insurer: Northwind General, item: transfer_form, mode: upload, note: "Form 29/30 or a transfer letter signed by both parties"}
-  - {type: change-of-owner, insurer: Northwind General, item: aadhaar, mode: upload, note: "new owner, front and back"}
+  - {type: change-of-owner, insurer: Northwind General, item: aadhaar, mode: upload, note: "new owner"}
   - {type: change-of-owner, insurer: Northwind General, item: noc, mode: upload, condition: "only if the policy shows a financier (hypothecation)"}
   - {type: change-of-owner, insurer: Northwind General, item: inspection_report, mode: upload, condition: "only if the transfer date is more than 14 days ago"}
   - {type: change-of-owner, insurer: Northwind General, item: new_owner_name, mode: text}
@@ -29,13 +31,13 @@ rows:
   - {type: change-of-owner, insurer: Northwind General, item: transfer_date, mode: text}
   - {type: change-of-owner, insurer: Cedar Mutual, item: rc, mode: upload, note: "RC already transferred, in the new owner's name"}
   - {type: change-of-owner, insurer: Cedar Mutual, item: transfer_form, mode: upload, note: "Form 29/30 only; a plain letter is not accepted"}
-  - {type: change-of-owner, insurer: Cedar Mutual, item: aadhaar, mode: upload, note: "new owner, front and back"}
+  - {type: change-of-owner, insurer: Cedar Mutual, item: aadhaar, mode: upload, note: "new owner"}
   - {type: change-of-owner, insurer: Cedar Mutual, item: pan, mode: upload, condition: "only if the new owner is a company or the vehicle is a commercial vehicle"}
   - {type: change-of-owner, insurer: Cedar Mutual, item: new_owner_name, mode: text}
   - {type: change-of-owner, insurer: Cedar Mutual, item: new_owner_phone, mode: text}
   - {type: change-of-owner, insurer: Cedar Mutual, item: transfer_date, mode: text}
   - {type: change-of-owner, insurer: Halcyon Assurance, item: rc, mode: upload, note: "RC already transferred, in the new owner's name"}
-  - {type: change-of-owner, insurer: Halcyon Assurance, item: aadhaar, mode: upload, note: "new owner, front and back"}
+  - {type: change-of-owner, insurer: Halcyon Assurance, item: aadhaar, mode: upload, note: "new owner"}
   - {type: change-of-owner, insurer: Halcyon Assurance, item: pan, mode: upload, note: "new owner"}
   - {type: change-of-owner, insurer: Halcyon Assurance, item: noc, mode: upload, condition: "only if the policy shows a financier; the NOC must name the new owner"}
   - {type: change-of-owner, insurer: Halcyon Assurance, item: new_owner_name, mode: text}

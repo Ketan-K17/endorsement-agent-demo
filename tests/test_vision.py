@@ -40,14 +40,25 @@ def vision(reply: Any) -> LLMVision:
 
 
 async def test_classify_keeps_a_known_type() -> None:
-    c = await vision(_Classified(doc_type="rc", quality="ok", note=None)).classify(UPLOAD, ["rc"])
+    reply = _Classified(doc_type="rc", quality="ok", parts=[], note=None)
+    c = await vision(reply).classify(UPLOAD, ["rc"], {})
     assert (c.doc_type, c.quality) == ("rc", "ok")
 
 
 async def test_classify_maps_an_unknown_type_to_other() -> None:
-    reply = _Classified(doc_type="registration", quality="poor", note="blurred")
-    c = await vision(reply).classify(UPLOAD, ["rc"])
+    reply = _Classified(doc_type="registration", quality="poor", parts=[], note="blurred")
+    c = await vision(reply).classify(UPLOAD, ["rc"], {})
     assert (c.doc_type, c.note) == ("other", "blurred")
+
+
+async def test_classify_keeps_only_the_types_own_parts_in_order() -> None:
+    model = FakeModel(
+        _Classified(doc_type="aadhaar", quality="ok", parts=["back", "page_1", "front"], note=None)
+    )
+    parts = {"aadhaar": ["front", "back"], "policy_copy": ["page_1", "page_2"]}
+    c = await LLMVision(model).classify(UPLOAD, ["aadhaar"], parts)  # type: ignore[arg-type]
+    assert c.parts == ["front", "back"]
+    assert "aadhaar: front, back; policy_copy: page_1, page_2" in model.prompts[0][0].content
 
 
 async def test_extract_returns_exactly_the_requested_fields() -> None:
@@ -86,13 +97,13 @@ async def test_model_failure_is_a_vision_error_without_its_message() -> None:
     request = httpx.Request("POST", "https://example.test")
     error = openai.APIConnectionError(message="secret detail", request=request)
     with pytest.raises(VisionError) as e:
-        await vision(error).classify(UPLOAD, ["rc"])
+        await vision(error).classify(UPLOAD, ["rc"], {})
     assert "secret detail" not in str(e.value)
 
 
 async def test_the_image_is_sent_with_strict_schema() -> None:
-    model = FakeModel(_Classified(doc_type="rc", quality="ok", note=None))
-    await LLMVision(model).classify(UPLOAD, ["rc"])  # type: ignore[arg-type]
+    model = FakeModel(_Classified(doc_type="rc", quality="ok", parts=[], note=None))
+    await LLMVision(model).classify(UPLOAD, ["rc"], {})  # type: ignore[arg-type]
     assert model.kwargs == {"method": "json_schema", "strict": True}
     part = model.prompts[0][1].content[0]
     assert part["image_url"]["url"].startswith("data:image/png;base64,")

@@ -12,11 +12,12 @@ from typing import Literal
 from pydantic import AwareDatetime, BaseModel
 
 from endorsement_agent.case_file import CaseFile, Doc
+from endorsement_agent.events import DocRequirement
 
 LOW_CONFIDENCE = 0.7
 
 Stage = Literal["Intake", "Docs", "Validate", "Approval", "Insurer", "Done", "Handover"]
-DocState = Literal["missing", "received", "accepted", "rejected", "waived"]
+DocState = Literal["missing", "received", "partial", "accepted", "rejected", "waived"]
 
 
 class DocCheck(BaseModel):
@@ -65,14 +66,20 @@ class StatusBar(BaseModel):
     context: ContextMeter
 
 
-def _check(name: str, condition: str | None, docs: list[Doc], waivers: dict[str, str]) -> DocCheck:
+def _check(req: DocRequirement, docs: list[Doc], waivers: dict[str, str]) -> DocCheck:
+    name = req.name
     if name in waivers:
         return DocCheck(name=name, state="waived", reason=waivers[name])
     matching = [d for d in docs if d.type == name]
-    if any(d.verdict == "accepted" for d in matching):
+    accepted = [d for d in matching if d.verdict == "accepted"]
+    if accepted:
+        # Accepted only once the accepted uploads cover every part (ADR-0023).
+        covered = {p for d in accepted for p in d.parts}
+        if needed := [p for p in req.parts if p not in covered]:
+            return DocCheck(name=name, state="partial", reason=f"needs {', '.join(needed)}")
         return DocCheck(name=name, state="accepted")
     if not matching:
-        return DocCheck(name=name, state="missing", reason=condition)
+        return DocCheck(name=name, state="missing", reason=req.condition)
     latest = matching[-1]
     if latest.verdict == "rejected":
         return DocCheck(name=name, state="rejected", reason=latest.verdict_reason)
@@ -82,9 +89,7 @@ def _check(name: str, condition: str | None, docs: list[Doc], waivers: dict[str,
 def docs_checklist(case: CaseFile) -> list[DocCheck]:
     if case.requirements is None:
         return []
-    return [
-        _check(r.name, r.condition, case.documents, case.waivers) for r in case.requirements.docs
-    ]
+    return [_check(r, case.documents, case.waivers) for r in case.requirements.docs]
 
 
 def stage(case: CaseFile) -> Stage:

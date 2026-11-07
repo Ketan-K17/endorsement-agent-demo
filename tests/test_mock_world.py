@@ -94,6 +94,14 @@ def test_rules_cover_every_type_and_insurer(rules: RulesMaster) -> None:
     assert 40 <= len(rules.rows) <= 50
 
 
+def test_aadhaar_and_policy_copy_need_every_part_everywhere(rules: RulesMaster) -> None:
+    for t in rules.types:
+        for insurer in INSURERS:
+            for req in rules.get(t, insurer).requirements().docs:
+                want = {"aadhaar": ["front", "back"], "policy_copy": ["page_1", "page_2"]}
+                assert req.parts == want.get(req.name, [])
+
+
 def test_every_insurer_has_conditional_twists(rules: RulesMaster) -> None:
     for insurer in INSURERS:
         assert sum(1 for r in rules.rows if r.insurer == insurer and r.condition) >= 2

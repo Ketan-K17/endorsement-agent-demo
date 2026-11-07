@@ -7,7 +7,7 @@ from datetime import date, datetime
 from typing import Literal, Protocol
 from zoneinfo import ZoneInfo
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from endorsement_agent.case_file import CaseFile
 from endorsement_agent.event_store import EventStore
@@ -30,6 +30,7 @@ class Upload(BaseModel):
 class Classification(BaseModel):
     doc_type: str  # a rules-master doc type, or "other"
     quality: Literal["ok", "poor", "unreadable"]
+    parts: list[str] = Field(default_factory=list)  # which of the type's parts it shows
     note: str | None = None
 
 
@@ -40,7 +41,9 @@ class VisionError(Exception):
 class Vision(Protocol):
     """Document reading on the extractor role. Implemented in build step 4."""
 
-    async def classify(self, upload: Upload, doc_types: list[str]) -> Classification: ...
+    async def classify(
+        self, upload: Upload, doc_types: list[str], doc_parts: dict[str, list[str]]
+    ) -> Classification: ...
 
     async def extract(
         self, upload: Upload, doc_type: str, fields: list[str]

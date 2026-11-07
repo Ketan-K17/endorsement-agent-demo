@@ -11,8 +11,9 @@ from endorsement_agent.consistency import LLMChecker
 from endorsement_agent.events import ApprovalDecided, ApprovalRequested, ExtractedField
 from endorsement_agent.runtime import Classification, Runtime
 from endorsement_agent.skills import SkillLibrary
+from endorsement_agent.status import docs_checklist
 from endorsement_agent.tools import TOOLS, call, definitions, execute
-from endorsement_agent.validation import compare
+from endorsement_agent.validation import compare, issues
 from tests.fakes import FakeChecker, FakeVision, runtime
 
 
@@ -52,7 +53,8 @@ async def owner_transfer_ready(rt: Runtime) -> None:
         )
     for doc_type in ("rc", "transfer_form", "aadhaar"):
         u = rt.add_upload(f"{doc_type}.jpg", "image/jpeg", b"x")
-        vision(rt).types[u.doc_id] = Classification(doc_type=doc_type, quality="ok")
+        parts = rt.rules.doc_parts.get(doc_type, [])  # one print with both sides
+        vision(rt).types[u.doc_id] = Classification(doc_type=doc_type, quality="ok", parts=parts)
         vision(rt).fields[u.doc_id] = {
             "reg_no": ExtractedField(value="KA05MZ4182", confidence=0.95)
         }
@@ -144,6 +146,32 @@ async def test_poor_doc_rejected_clear_required_doc_accepted(rt: Runtime) -> Non
     assert rt.case.doc(blurry.doc_id).verdict == "rejected"
     assert rt.case.doc(blurry.doc_id).verdict_reason == "poor image: blur"
     assert rt.case.doc("doc_1").verdict == "accepted"
+
+
+async def test_a_document_in_parts_is_partial_until_every_part_is_in(rt: Runtime) -> None:
+    await execute(rt, "lookup_policy", {"policy_no": "HLA/MC/88104577"})
+    await execute(rt, "record_change_request", {"type": "nominee-update"})
+    out = await execute(
+        rt, "get_endorsement_rules", {"type": "nominee-update", "insurer": "Halcyon Assurance"}
+    )
+    assert json.loads(out)["doc_parts"]["aadhaar"] == ["front", "back"]
+
+    async def upload(part: str) -> str:
+        u = rt.add_upload(f"aadhaar_{part}.png", "image/png", b"x")
+        vision(rt).types[u.doc_id] = Classification(doc_type="aadhaar", quality="ok", parts=[part])
+        vision(rt).fields[u.doc_id] = {"name": ExtractedField(value="L N", confidence=0.9)}
+        await execute(rt, "classify_document", {"doc_id": u.doc_id})
+        return await execute(rt, "extract_fields", {"doc_id": u.doc_id, "fields": ["name"]})
+
+    def aadhaar() -> tuple[str, str | None]:
+        check = next(c for c in docs_checklist(rt.case) if c.name == "aadhaar")
+        return check.state, check.reason
+
+    assert (await upload("front")).endswith("Status: accepted; aadhaar still needs back")
+    assert aadhaar() == ("partial", "needs back")
+    assert "doc aadhaar is partial" in issues(rt.case)
+    assert (await upload("back")).endswith("Status: accepted")
+    assert aadhaar() == ("accepted", None)
 
 
 async def test_extract_wraps_content_and_skips_unrequired_types(rt: Runtime) -> None:

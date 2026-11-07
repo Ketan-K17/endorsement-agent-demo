@@ -39,11 +39,14 @@ class EndorsementRules(BaseModel):
     tat_days: int
     handover_if: list[str]
     rows: list[RuleRow]
+    doc_parts: dict[str, list[str]] = Field(default_factory=dict)  # only types in `rows`
 
     def requirements(self) -> Requirements:
         return Requirements(
             docs=[
-                DocRequirement(name=r.item, condition=r.condition)
+                DocRequirement(
+                    name=r.item, condition=r.condition, parts=self.doc_parts.get(r.item, [])
+                )
                 for r in self.rows
                 if r.mode == "upload"
             ],
@@ -57,12 +60,15 @@ class EndorsementRules(BaseModel):
 
 class RulesMaster(BaseModel):
     doc_types: list[str]
+    doc_parts: dict[str, list[str]] = Field(default_factory=dict)
     terms: list[Terms]
     rows: list[RuleRow]
 
     @model_validator(mode="after")
     def _consistent(self) -> RulesMaster:
         keys = {(t.type, t.insurer) for t in self.terms}
+        if unknown := set(self.doc_parts) - set(self.doc_types):
+            raise ValueError(f"parts for unknown doc types: {sorted(unknown)}")
         seen: set[tuple[str, str, str]] = set()
         for r in self.rows:
             if (r.type, r.insurer) not in keys:
@@ -87,11 +93,13 @@ class RulesMaster(BaseModel):
         terms = next((t for t in self.terms if (t.type, t.insurer) == (type, insurer)), None)
         if terms is None:
             raise KeyError(f"no rules for type={type!r} insurer={insurer!r}")
+        rows = [r for r in self.rows if (r.type, r.insurer) == (type, insurer)]
         return EndorsementRules(
             type=type,
             insurer=insurer,
             fee_inr=terms.fee_inr,
             tat_days=terms.tat_days,
             handover_if=terms.handover_if,
-            rows=[r for r in self.rows if (r.type, r.insurer) == (type, insurer)],
+            rows=rows,
+            doc_parts={r.item: self.doc_parts[r.item] for r in rows if r.item in self.doc_parts},
         )

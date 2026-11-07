@@ -65,6 +65,7 @@ class Doc(BaseModel):
     filename: str
     type: str | None = None
     quality: Literal["ok", "poor", "unreadable"] | None = None
+    parts: list[str] = Field(default_factory=list)
     extraction: dict[str, ExtractedField] | None = None
     verdict: Literal["accepted", "rejected"] | None = None
     verdict_reason: str | None = None
@@ -157,9 +158,9 @@ def apply(case: CaseFile, event: CaseEvent) -> CaseFile:
             )
         case DocumentUploaded(doc_id=doc_id, filename=filename):
             c.documents.append(Doc(id=doc_id, filename=filename))
-        case DocumentClassified(doc_id=doc_id, doc_type=doc_type, quality=quality):
+        case DocumentClassified(doc_id=doc_id, doc_type=doc_type, quality=quality, parts=parts):
             d = c.doc(doc_id)
-            d.type, d.quality = doc_type, quality
+            d.type, d.quality, d.parts = doc_type, quality, parts
         case DocumentExtracted(doc_id=doc_id, fields=fields):
             c.doc(doc_id).extraction = fields
         case DocumentReviewed(doc_id=doc_id, verdict=verdict, reason=reason):

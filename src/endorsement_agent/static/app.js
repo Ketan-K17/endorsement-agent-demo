@@ -644,6 +644,7 @@ function renderAssignee(a) {
     customer: `${you} (The Customer) 🧢`,
     approver: `${you} (The Approver) 🎩`,
     insurer: a.name || "The insurer",
+    team: `${a.name} (Endorsements team)`,
   }[a.role];
   $("assignee").textContent = label;
   $("assignee").className = a.role;

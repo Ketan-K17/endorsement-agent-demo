@@ -14,6 +14,8 @@
 
 **Required docs** — the documents an endorsement type needs for a given insurer, from the rules master.
 
+**Part** — one side or page of a document type that comes in several (`doc_parts` in the rules master: Aadhaar front/back, policy copy page_1/page_2). A required doc is `partial` until every part is accepted.
+
 **SOP** — the standard operating procedure for handling endorsements. Invented for this demo. Lives wholly in the system prompt.
 
 **System prompt** — role + basic guidelines + full SOP.

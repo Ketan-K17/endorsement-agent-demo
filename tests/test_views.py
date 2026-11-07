@@ -6,6 +6,7 @@ from endorsement_agent.case_file import fold
 from endorsement_agent.events import (
     CaseCreated,
     ExtractedField,
+    HandoverRaised,
     InsurerSubmitted,
     InsurerUpdated,
     PolicySelected,
@@ -131,3 +132,8 @@ def test_assignee_follows_whose_move_it_is() -> None:
     assert assignee(query, busy=False, awaiting_approval=False).role == "customer"
     issued = fold([*events, InsurerSubmitted(ref="R1"), InsurerUpdated(stage="issued")])
     assert assignee(issued, busy=False, awaiting_approval=False).role == "customer"
+    handed = fold([*events, HandoverRaised(team="endorsements-ops", reason="r", severity="low")])
+    assert assignee(handed, busy=False, awaiting_approval=False).model_dump() == {
+        "role": "team",
+        "name": "endorsements-ops",
+    }

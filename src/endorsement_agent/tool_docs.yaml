@@ -50,7 +50,7 @@ tools:
     group: documents
     summary: Looks at an uploaded image and decides what it is (RC, Aadhaar, PAN...) and whether it is readable.
     when: For each new upload, before reading fields.
-    guardrails: Poor or unreadable images are rejected so the agent asks for a clearer copy.
+    guardrails: Poor or unreadable images are rejected so the agent asks for a clearer copy. Also says which part an image shows (Aadhaar front or back, policy copy page 1 or 2); such a document is only complete once every part is in.
   extract_fields:
     group: documents
     summary: Reads named fields from a classified document, each with a confidence score.

@@ -65,7 +65,7 @@ Small and coarse-grained. Every write goes through a validated tool.
 | | `get_endorsement_rules(type, insurer)` | Required docs / fees / TAT from the mock rules master |
 | | `waive_requirement(name, reason)` | Marks a conditional requirement as not applying; refuses unconditional ones (ADR-0014) |
 | Documents | `list_documents()` | Uploaded files + processing status |
-| | `classify_document(doc_id)` | Vision. Doc type + quality; poor/unreadable docs are rejected (ADR-0015) |
+| | `classify_document(doc_id)` | Vision. Doc type + quality + parts shown (Aadhaar front/back, policy copy pages); poor/unreadable docs are rejected (ADR-0015, ADR-0023) |
 | | `extract_fields(doc_id, schema)` | Vision. Values + per-field confidence; a clear doc of a required type is accepted |
 | | `cross_check(slot_a, slot_b)` | Name / reg-no / chassis consistency |
 | Skills | `load_skill(name)` | Result is `loading skill <name>`; `SKILL.md` follows as a user message (ADR-0015); catalog lives in this tool's definition |
@@ -124,7 +124,7 @@ Ask budget (max asks/case; excess forces summarise-or-handover), tool-call cap p
 
 Pure function `render_status(case, today) -> StatusBar`, serialised two ways: compact text appended to the model call (§2) and JSON streamed to the UI over SSE.
 
-Fields: `today` (passed in; dynamic facts belong here, not in the static prefix), `stage` (computed from state predicates, never stored), `active_skills`, `docs_checklist[{name,state,reason}]`, `slots{filled,total,low_conf[]}`, `ask_budget{used,max}`, `validation{verdict,changed_since_last}`, `approval{status}`, `insurer{stage,ref}`, `context{uncompressed_tool_results,threshold,last_compressed_at}`, `current_activity` (UI only), `trace_view` (UI only; in-app, not a Langfuse link, ADR-0009). The two UI-only fields are added by the API layer, not by `render_status` (ADR-0013).
+Fields: `today` (passed in; dynamic facts belong here, not in the static prefix), `stage` (computed from state predicates, never stored), `active_skills`, `docs_checklist[{name,state,reason}]` (state `partial` until every part of a multi-part doc is accepted, ADR-0023), `slots{filled,total,low_conf[]}`, `ask_budget{used,max}`, `validation{verdict,changed_since_last}`, `approval{status}`, `insurer{stage,ref}`, `context{uncompressed_tool_results,threshold,last_compressed_at}`, `current_activity` (UI only), `trace_view` (UI only; in-app, not a Langfuse link, ADR-0009). The two UI-only fields are added by the API layer, not by `render_status` (ADR-0013).
 
 Stages, computed from state in order (never stored):
 Intake (no change request yet) → Docs (required docs not all `accepted`) → Validate (all docs in, no passing verdict) → Approval (verdict passes, no decision) → Insurer (approved, not issued) → Done. Handover applies at any point.
