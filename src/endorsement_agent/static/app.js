@@ -21,6 +21,7 @@ const state = {
   status: null,        // the last status bar, so a name change can re-render the assignee
   submitted: null,      // insurer ref just submitted, celebrated when the turn settles
   insurer: null,        // the insurer named on the last approval card
+  thinking: null,       // {node, phrase, detail, timer}: the agent's placeholder while it works
 };
 
 // --- helpers ---------------------------------------------------------------------------------
@@ -73,12 +74,11 @@ const ms = (a, b) => new Date(b) - new Date(a);
 const secs = (n) => (n >= 1000 ? `${(n / 1000).toFixed(1)}s` : `${n}ms`);
 const short = (v, n = 60) => { const s = typeof v === "string" ? v : JSON.stringify(v); return s.length > n ? s.slice(0, n - 1) + "…" : s; };
 const clock = (ts) => new Date(ts ?? Date.now()).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-const mmss = (n) => { const s = Math.max(0, Math.round(n / 1000)); return `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`; };
 const kTok = (n) => `${(n / 1000).toFixed(1)}k`;
 const isRefused = (content) => /^(refused|error)/.test(content);
 const docName = (id, events) => events.find((x) => x.type === "document.uploaded" && x.doc_id === id)?.filename || id;
 
-// Tools that mark a turning point: a red dot in the recorder, a highlight on the margin note.
+// Tools that mark a turning point: a highlight on the margin note and the trace row.
 const MARKS = new Set(["ask_user", "request_approval", "handover", "submit_to_insurer", "respond_to_insurer"]);
 
 // "classify_document ×2 · extract_fields": names in call order, repeats counted.
@@ -144,14 +144,14 @@ function renderCases() {
 
 function resetView() {
   if (state.source) state.source.close();
+  hideThinking();
   Object.assign(state, { sid: null, source: null, events: [], lastSeq: 0, draft: null, note: null, live: false, attachments: [], submitted: null });
   state.calls.clear();
   setBusy(false);
-  for (const id of ["chat", "feed", "trace", "context"]) $(id).replaceChildren();
+  for (const id of ["chat", "trace", "context"]) $(id).replaceChildren();
   $("approval").hidden = true;
   $("pad-title").textContent = "Case notes";
   $("pad-date").textContent = "";
-  $("recorder-clock").textContent = "";
   renderSlots([]);
   renderAttachments();
 }
@@ -166,6 +166,7 @@ function connect(sid) {
   source.addEventListener("status", (m) => onStatus(JSON.parse(m.data)));
   source.addEventListener("turn", (m) => onTurn(JSON.parse(m.data)));
   source.addEventListener("agent_error", (m) => {
+    hideThinking();
     addEntry("error", JSON.parse(m.data).message);
     state.draft = null;
   });
@@ -222,7 +223,7 @@ function onCaseEvent(e) {
   if (e.type === "slot.recorded" || e.type === "document.uploaded") renderSlots(state.events);
   if (!state.replaying) {
     showEvent(e, state.events);
-    renderRecorder(state.events);
+    if (state.live && (e.type === "message.user" || e.type === "approval.decided")) showThinking();
   }
   if (!$("tab-trace").hidden) renderTrace();
 }
@@ -234,6 +235,7 @@ function showEvent(e, events) {
       addEntry("user", e.text, e.doc_ids.map((id) => docName(id, events)), false, e.ts);
       break;
     case "message.assistant":
+      hideThinking();
       state.note = null;
       if (state.draft) {
         state.draft.classList.remove("streaming");
@@ -255,6 +257,7 @@ function showEvent(e, events) {
 
 function onToken(text) {
   if (state.replaying) return;
+  hideThinking();
   if (!state.draft) state.draft = addEntry("assistant", "", [], true);
   state.draft.textContent += text;
   scrollDown($("chat"));
@@ -272,6 +275,7 @@ function onStatus(s) {
 }
 
 function onTurn(turn) {
+  hideThinking();
   state.draft = null;
   if (turn.approval) showApproval(turn.approval);
   if (!$("tab-context").hidden) renderContext();
@@ -291,6 +295,37 @@ function addEntry(kind, text, files = [], streaming = false, ts = null) {
     el("div", { class: "who" }, WHO[kind], el("time", { text: clock(ts) })), body));
   scrollDown($("chat"));
   return body;
+}
+
+// While the agent works and before it writes, its line on the pad cycles through desk chatter.
+// The step's margin notes land underneath; the placeholder goes when the reply starts.
+const PHRASES = [
+  "Shuffling paperwork", "Licking stamps", "Squinting at the fine print", "Consulting the rulebook",
+  "Rummaging through the filing cabinet", "Untangling red tape", "Sharpening pencils",
+  "Dusting off the policy binder", "Cross-referencing clauses", "Counting carbon copies",
+  "Warming up the rubber stamp", "Dotting i's, crossing t's", "Pondering premiums",
+  "Flipping through annexures", "Straightening the in-tray", "Topping up the ink",
+];
+const phrase = (not) => { let p; do p = PHRASES[Math.floor(Math.random() * PHRASES.length)]; while (p === not); return `${p}…`; };
+
+function showThinking() {
+  if (state.thinking || state.draft) return;
+  const text = phrase();
+  const p = el("span", { class: "phrase", text });
+  const detail = el("small");
+  const node = el("div", { class: "entry assistant thinking" },
+    el("div", { class: "who" }, WHO.assistant, el("time", { text: clock() })), el("div", { class: "text" }, p, detail));
+  $("chat").append(node);
+  const timer = setInterval(() => { p.textContent = phrase(p.textContent.slice(0, -1)); }, 2400);
+  state.thinking = { node, detail, timer };
+  scrollDown($("chat"));
+}
+
+function hideThinking() {
+  if (!state.thinking) return;
+  clearInterval(state.thinking.timer);
+  state.thinking.node.remove();
+  state.thinking = null;
 }
 
 // One margin note per model step: its tool calls folded to a line, unfolding to args and results.
@@ -323,97 +358,6 @@ function noteResult(e) {
     c.line.classList.add("refused");
     c.node.classList.add("flag");
   }
-}
-
-// --- flight recorder -------------------------------------------------------------------------
-
-// Rebuilt from the events on every change, so replay drives it too. One row shape for every
-// step: routine calls in one model step fold into a row, changes get a row each, turning
-// points a red dot.
-const SOLO = new Set(["record_slot", "record_change_request", "waive_requirement", "validate_case"]);
-
-function stepDetail(e, r, events) {
-  const a = e.args || {};
-  if (!r) return "running…";
-  if (isRefused(r.content)) return short(r.content, 60);
-  switch (e.tool) {
-    case "record_slot": return `${a.name} → ${short(a.value, 40)}`;
-    case "record_change_request": return `change → ${a.type}`;
-    case "waive_requirement": return `waived ${a.name}`;
-    case "ask_user": return short((a.questions || [])[0] || "", 60);
-    case "handover": return `${a.team} · ${a.severity}`;
-    case "request_approval":
-      return events.some((x) => x.type === "approval.decided" && x.seq > e.seq) ? "sent for approval" : "waiting for you";
-    case "validate_case":
-    case "submit_to_insurer":
-      return short(r.content, 50);
-    default: return null;
-  }
-}
-
-function recRow(cls, time, step, detail = null) {
-  return el("li", { class: cls }, el("time", { text: time }),
-    el("span", { class: "step" }, step, detail ? el("small", { text: detail }) : null));
-}
-
-function renderRecorder(events) {
-  const start = events[0]?.ts;
-  const at = (e) => (start ? mmss(ms(start, e.ts)) : "");
-  const results = new Map(events.filter((e) => e.type === "tool.result").map((e) => [e.call_id, e]));
-  const rows = [];
-  let run = [];
-  let turn = 0;
-  const flush = () => {
-    const running = run.some((e) => !results.has(e.call_id)) ? "running" : "";
-    if (run.length === 1) rows.push(recRow(running, at(run[0]), refLink("tool", run[0].tool), stepDetail(run[0], results.get(run[0].call_id), events)));
-    else if (run.length) {
-      const names = tally(run.map((e) => e.tool));
-      rows.push(recRow(running, at(run[0]), el("details", {}, el("summary", { text: `${run.length} steps` }), el("small", { text: names }))));
-    }
-    run = [];
-  };
-  for (const e of events) {
-    switch (e.type) {
-      case "message.user": {
-        flush();
-        turn += 1;
-        const n = e.doc_ids.length;
-        rows.push(recRow("turn", at(e), `turn ${turn} · ${n ? `${n} document${n > 1 ? "s" : ""}` : turn === 1 ? "you wrote" : "you replied"}`));
-        break;
-      }
-      case "model.called":
-        flush();
-        break;
-      case "tool.called": {
-        const r = results.get(e.call_id);
-        const mark = MARKS.has(e.tool) || (r && isRefused(r.content));
-        if (!mark && !SOLO.has(e.tool)) { run.push(e); break; }
-        flush();
-        rows.push(recRow(`${mark ? "mark" : ""}${r ? "" : " running"}`, at(e), refLink("tool", e.tool), stepDetail(e, r, events)));
-        break;
-      }
-      case "context.compressed":
-        flush();
-        rows.push(recRow("faded", at(e), `compressed ${e.call_ids.length} results`, `${kTok(e.tokens_before)} → ${kTok(e.tokens_after)} tokens`));
-        break;
-      case "history.image_stubbed":
-        flush();
-        rows.push(recRow("faded", at(e), "image stubbed", docName(e.doc_id, events)));
-        break;
-      case "approval.decided":
-        flush();
-        rows.push(recRow("mark", at(e), `approval ${e.status}`, e.reason));
-        break;
-      case "insurer.updated":
-        flush();
-        rows.push(recRow("", at(e), `insurer · ${e.stage.replace("_", " ")}`, e.message));
-        break;
-    }
-  }
-  flush();
-  $("feed").replaceChildren(...rows);
-  $("recorder-clock").textContent = events.length ? at(events[events.length - 1]) : "";
-  scrollDown(document.querySelector(".recorder"));
 }
 
 function setBusy(busy) {
@@ -571,6 +515,9 @@ function renderStatus(s) {
   $("activity").textContent = s.current_activity;
   $("activity").className = `activity${busy ? " busy" : ""}`;
   setBusy(busy);
+  if (busy && state.live && !state.replaying) showThinking();  // e.g. a reload mid-turn
+  else if (!busy) hideThinking();
+  if (state.thinking) state.thinking.detail.textContent = busy ? s.current_activity : "";
   if (state.submitted && !busy) {
     window.celebrateSubmission?.({ insurer: s.assignee.name || state.insurer, ref: state.submitted });
     state.submitted = null;
@@ -751,25 +698,23 @@ function renderTrace() {
     el("span", { text: `${tokens.toLocaleString()} TOK` }));
 }
 
-// Replay plays the session's own events back into the chat and activity feed (ADR-0008).
+// Replay plays the session's own events back into the chat (ADR-0008).
 async function replay() {
   if (state.replaying || !state.events.length) return;
   state.replaying = true;
   selectTab("chat");
+  hideThinking();
   $("chat").replaceChildren();
-  $("feed").replaceChildren();
   state.calls.clear();
   state.draft = null;
   state.note = null;
   const events = state.events.slice();
   for (let i = 0; i < events.length; i++) {
     showEvent(events[i], events);
-    renderRecorder(events.slice(0, i + 1));
     const gap = i + 1 < events.length ? ms(events[i].ts, events[i + 1].ts) : 0;
     await new Promise((r) => setTimeout(r, Math.min(800, Math.max(60, gap / 4))));
   }
   for (const e of state.events.slice(events.length)) showEvent(e, state.events);  // arrived meanwhile
-  renderRecorder(state.events);
   state.replaying = false;
 }
 
@@ -872,7 +817,7 @@ async function renderReference() {
     const sections = d.groups.map((g) => el("section", {}, el("h2", { text: g.title }),
       el("p", { class: "muted", text: g.blurb }), ...d.tools.filter((t) => t.group === g.id).map(toolEntry)));
     root.replaceChildren(toc, el("div", { class: "ref-body" },
-      el("p", { class: "muted" }, "Everything the agent can call. Names in the Activity feed, Trace and Context tabs link here."),
+      el("p", { class: "muted" }, "Everything the agent can call. Names in the chat's margin notes, Trace and Context tabs link here."),
       ...sections, el("section", {}, el("h2", { text: "Skills" }),
         el("p", { class: "muted", text: "Playbooks the agent loads on demand with load_skill. Each arrives as a message, not a tool result." }),
         ...d.skills.map(skillEntry))));
