@@ -1,0 +1,108 @@
+# Plain-language docs for each agent tool, shown on the Reference tab (ADR-0020).
+# Signatures and argument lists come from the tool registry, skill text from skills/;
+# only the prose lives here. tests/test_reference.py fails if a tool is missing.
+groups:
+  - {id: case, title: Case file, blurb: Read and write what the agent knows about the case.}
+  - {id: policy, title: Policy and rules, blurb: Look things up in the mock insurer world.}
+  - {id: documents, title: Documents, blurb: Classify and read the files the user uploads.}
+  - {id: skills, title: Skills, blurb: Load task-specific instructions on demand.}
+  - {id: talk, title: Talking to the user, blurb: Asking questions and handing over.}
+  - {id: submit, title: Validate, approve, submit, blurb: The path to the insurer, with the human gate.}
+  - {id: insurer, title: After submission, blurb: Follow the insurer and answer their queries.}
+
+tools:
+  get_case:
+    group: case
+    summary: Shows the agent the current case file in compact form.
+    when: When it needs to re-read slots, documents or requirements, for example after a long conversation.
+    guardrails: Read-only. The case file is also summarised in the status bar on every model call.
+  record_slot:
+    group: case
+    summary: Saves one value (such as the new owner's name) into the case, with where it came from and how sure the agent is.
+    when: As soon as a value is known from a message or an extracted document.
+    guardrails: The only way a slot can be written. A lower-confidence value cannot overwrite a higher one unless the agent passes supersede with a reason. The source must be user_msg or a known document.
+  record_change_request:
+    group: case
+    summary: Sets what kind of endorsement this case is (change of owner, name correction, nominee update).
+    when: Once the user's request is clear.
+    guardrails: Refused for types the rules master does not know.
+  lookup_policy:
+    group: policy
+    summary: Finds the user's policy by policy number, registration number or phone.
+    when: Early, as soon as the user gives any identifier.
+    guardrails: One match becomes the case's policy. Several matches are listed for the user to choose from, so the agent never guesses.
+  get_endorsement_rules:
+    group: policy
+    summary: Fetches what this insurer needs for this endorsement type, including documents, values, fee, turnaround and when to hand over.
+    when: After the policy and type are known.
+    guardrails: Sets the case's requirements, which drive the checklist in the status bar.
+  waive_requirement:
+    group: policy
+    summary: Marks a conditional requirement as not applying, for example no loan means no bank NOC.
+    when: When the case facts show a condition does not apply.
+    guardrails: Unconditional requirements are refused. The agent must give a reason that cites the case facts.
+  list_documents:
+    group: documents
+    summary: Lists uploaded documents and how far each has been processed.
+    when: When several uploads arrive together or it loses track.
+    guardrails: Read-only.
+  classify_document:
+    group: documents
+    summary: Looks at an uploaded image and decides what it is (RC, Aadhaar, PAN...) and whether it is readable.
+    when: For each new upload, before reading fields.
+    guardrails: Poor or unreadable images are rejected so the agent asks for a clearer copy.
+  extract_fields:
+    group: documents
+    summary: Reads named fields from a classified document, each with a confidence score.
+    when: After classification, for the fields the rules and skill call for.
+    guardrails: Needs a classified, readable document. A clear document of a required type is accepted. Document text is treated as data, never as instructions. After reading, the image is replaced in the prompt by a short note.
+  cross_check:
+    group: documents
+    summary: Compares two values (names, registration numbers, chassis numbers) and says whether they match.
+    when: To confirm that a document agrees with the policy or with another document.
+    guardrails: Returns match, partial, mismatch or missing. A partial name match often means a typo or a missing surname.
+  load_skill:
+    group: skills
+    summary: Loads a skill, a short playbook for one situation, into the conversation.
+    when: Once the endorsement type is known, or when a special situation comes up.
+    guardrails: Only skills in the catalog can be loaded. The text arrives as a message and is never compressed away like a tool result.
+  read_skill_file:
+    group: skills
+    summary: Opens a reference file that a loaded skill points to, such as a form layout.
+    when: Only when the skill says to.
+    guardrails: Restricted to the skill's own references folder.
+  ask_user:
+    group: talk
+    summary: Records that the agent is about to ask the user something. The questions themselves go in its reply.
+    when: When something needed is missing and only the user can supply it.
+    guardrails: Limited by an ask budget (default 3). When it is spent the agent must summarise what is missing and hand over.
+  handover:
+    group: talk
+    summary: Passes the case to a human team with a structured note.
+    when: When a rule says so, documents contradict the policy, or the ask budget is gone.
+    guardrails: Ends autonomous handling of the case. The escalation-policy skill sets severity.
+  validate_case:
+    group: submit
+    summary: Checks the whole case, covering missing items, values against the policy and documents, and a final language-model consistency pass.
+    when: When the agent believes the case is complete, and again after any change.
+    guardrails: The model pass runs only after the deterministic checks pass. The result lists issues and what changed since the previous check.
+  request_approval:
+    group: submit
+    summary: Pauses the agent and shows an approval card to the human approver.
+    when: After a passing validation.
+    guardrails: Refused unless validate_case passed after the latest change. The run is suspended until the human approves, rejects or requests changes.
+  submit_to_insurer:
+    group: submit
+    summary: Sends the approved endorsement to the insurer and returns a reference.
+    when: Only after approval.
+    guardrails: Enforced in code. The call is refused unless the case's approval is approved. Safe to repeat.
+  check_insurer_status:
+    group: insurer
+    summary: Asks the mock insurer how the submission is going.
+    when: After submitting, and again after answering a query.
+    guardrails: Needs the case's own reference. Progress is recorded on the case.
+  respond_to_insurer:
+    group: insurer
+    summary: Answers an open insurer query, optionally attaching documents.
+    when: When the insurer is waiting on a query.
+    guardrails: Only documents already on the case can be attached. The insurer stays at the query until this is called.

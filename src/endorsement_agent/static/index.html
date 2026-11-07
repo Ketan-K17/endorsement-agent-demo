@@ -173,6 +173,7 @@
     <button role="tab" data-tab="chat" aria-selected="true">Chat</button>
     <button role="tab" data-tab="trace" aria-selected="false">Trace</button>
     <button role="tab" data-tab="context" aria-selected="false">Context</button>
+    <button role="tab" data-tab="reference" aria-selected="false">Agent Documentation</button>
   </nav>
 
   <div class="layout">
@@ -237,6 +238,10 @@
           (old status bars, compressed tool results, stubbed images).
         </p>
         <div id="context"></div>
+      </section>
+
+      <section id="tab-reference" class="tab" role="tabpanel" hidden>
+        <div id="reference" class="reference"><p class="muted">Loading…</p></div>
       </section>
     </main>
 

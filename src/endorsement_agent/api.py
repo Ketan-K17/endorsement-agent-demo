@@ -24,6 +24,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import Base64Bytes, BaseModel, Field
 from sse_starlette.sse import EventSourceResponse
 
+from endorsement_agent import reference
 from endorsement_agent.config import Limits, fixed_today
 from endorsement_agent.consistency import LLMChecker
 from endorsement_agent.event_store import EventStore
@@ -224,6 +225,10 @@ def create_app(make_agent: Callable[[str], Agent] | None = None) -> FastAPI:
             if (FIXTURES / case).is_dir()
         ]
         return {"policies": policies, "cases": cases}
+
+    @app.get("/api/reference")
+    def reference_docs() -> dict[str, Any]:
+        return reference.build(SkillLibrary())
 
     @app.post("/api/sessions", status_code=201)
     def create_session() -> dict[str, str]:

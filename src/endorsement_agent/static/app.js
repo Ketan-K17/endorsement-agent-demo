@@ -28,6 +28,7 @@ function el(tag, attrs = {}, ...children) {
   for (const [k, v] of Object.entries(attrs)) {
     if (k === "class") node.className = v;
     else if (k === "text") node.textContent = v;
+    else if (k === "html") node.innerHTML = v;
     else node.setAttribute(k, v);
   }
   for (const c of children) if (c != null) node.append(c);
@@ -40,7 +41,7 @@ function escapeHtml(s) {
 
 // Just enough markdown for agent replies: paragraphs, "- " lists, **bold**. Escaped first.
 function renderMarkdown(text) {
-  const inline = (s) => escapeHtml(s).replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
+  const inline = (s) => escapeHtml(s).replace(/`([^`]+)`/g, "<code>$1</code>").replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
   const out = [];
   let list = null;
   for (const line of text.split("\n")) {
@@ -51,11 +52,20 @@ function renderMarkdown(text) {
       continue;
     }
     if (list) { out.push(`<ul>${list.join("")}</ul>`); list = null; }
-    if (line.trim()) out.push(`<p>${inline(line)}</p>`);
+    const head = line.match(/^#{1,3}\s+(.*)/);
+    if (head) out.push(`<h4>${inline(head[1])}</h4>`);
+    else if (line.trim()) out.push(`<p>${inline(line)}</p>`);
   }
   if (list) out.push(`<ul>${list.join("")}</ul>`);
   return out.join("");
 }
+
+// Every tool and skill name shown in the UI links to its entry on the Agent Documentation tab.
+const refHref = (kind, name) => `#/ref/${kind}/${encodeURIComponent(name)}`;
+const refLink = (kind, name, text = name) => el("a", { class: "ref-link", href: refHref(kind, name), "data-ref": "", text });
+
+// Skill ids named by a call: load_skill {name}, read_skill_file {skill}.
+const skillOf = (tool, args) => (tool === "load_skill" ? args?.name : tool === "read_skill_file" ? args?.skill : null);
 
 const ms = (a, b) => new Date(b) - new Date(a);
 const secs = (n) => (n >= 1000 ? `${(n / 1000).toFixed(1)}s` : `${n}ms`);
@@ -127,7 +137,7 @@ function showEvent(e, events) {
       } else addBubble("assistant", e.text);
       break;
     case "tool.called": {
-      const row = feedRow(e.tool, short(e.args, 40), "running", "running");
+      const row = feedRow(e.tool, short(e.args, 40), "running", "running", true);
       state.feedRows.set(e.call_id, { row, ts: e.ts });
       break;
     }
@@ -177,9 +187,10 @@ function addBubble(kind, text, files = [], streaming = false) {
   return bubble;
 }
 
-function feedRow(name, detail, time, cls) {
+function feedRow(name, detail, time, cls, link = null) {
+  const label = link ? refLink("tool", name) : name;
   const row = el("li", { class: cls },
-    el("span", { class: "name", text: detail ? `${name} ${detail}` : name }),
+    el("span", { class: "name" }, label, detail ? ` ${detail}` : null),
     el("span", { class: "time", text: time }));
   $("feed").append(row);
   scrollDown($("feed"));
@@ -443,9 +454,11 @@ function renderTrace() {
         el("td", { class: "mono", text: secs(e.duration_ms) }), el("td", { class: "mono", text: tok })));
     } else if (e.type === "tool.called") {
       const r = results.get(e.call_id);
+      const skill = skillOf(e.tool, e.args);
       const body = el("details", {}, el("summary", { text: short(e.args, 50) }),
-        el("pre", { text: `args: ${JSON.stringify(e.args, null, 1)}\n\nresult: ${r ? r.content : "(running)"}` }));
-      rows.push(el("tr", {}, el("td", { class: "mono", text: at }), el("td", { class: "mono", text: e.tool }),
+        el("pre", { text: `args: ${JSON.stringify(e.args, null, 1)}\n\nresult: ${r ? r.content : "(running)"}` }),
+        skill ? el("p", { class: "small" }, "Skill: ", refLink("skill", skill)) : null);
+      rows.push(el("tr", {}, el("td", { class: "mono", text: at }), el("td", { class: "mono" }, refLink("tool", e.tool)),
         el("td", {}, body), el("td", { class: "mono", text: r ? secs(ms(e.ts, r.ts)) : "…" }), el("td", { text: "" })));
     } else if (e.type === "context.compressed") {
       rows.push(el("tr", {}, el("td", { class: "mono", text: at }), el("td", { text: "compression" }),
@@ -480,6 +493,22 @@ async function replay() {
 
 // --- context tab -----------------------------------------------------------------------------
 
+// "Docs:" links under a context item: the tool results it came from, the calls it made, the skill it carries.
+function ctxLinks(it) {
+  const tools = new Set();
+  const skills = new Set();
+  if (it.kind === "tool" && it.note) tools.add(it.note.split(",")[0]);
+  if (it.kind === "assistant") for (const m of it.text.matchAll(/^→ (\w+)\(/gm)) tools.add(m[1]);
+  if (it.kind === "skill") {
+    const m = it.text.match(/^\[skill (?:file )?([\w-]+)/);
+    if (m) skills.add(m[1]);
+    tools.add(it.text.startsWith("[skill file") ? "read_skill_file" : "load_skill");
+  }
+  if (!tools.size && !skills.size) return null;
+  const parts = [...tools].map((t) => refLink("tool", t)).concat([...skills].map((k) => refLink("skill", k, `skill ${k}`)));
+  return el("p", { class: "small ctx-docs" }, "Docs: ", ...parts.flatMap((p, i) => (i ? [", ", p] : [p])));
+}
+
 async function renderContext() {
   if (!state.sid) return;
   const items = await fetch(`/api/sessions/${state.sid}/context`).then((r) => r.json());
@@ -487,8 +516,9 @@ async function renderContext() {
     const label = `${it.kind}${it.note ? ` · ${it.note}` : ""}${it.in_prompt ? "" : " · left the prompt"}`;
     const long = it.text.length > 400 || it.kind === "system";
     const pre = el("pre", { text: it.text });
-    const body = long ? el("details", {}, el("summary", { text: `${label} (${it.text.length} chars)` }), pre)
-      : el("div", {}, el("strong", { class: "small", text: label }), pre);
+    const links = ctxLinks(it);
+    const body = long ? el("details", {}, el("summary", { text: `${label} (${it.text.length} chars)` }), pre, links)
+      : el("div", {}, el("strong", { class: "small", text: label }), pre, links);
     return el("div", { class: `ctx ${it.in_prompt ? "in" : "out"}` }, body);
   }));
 }
@@ -497,10 +527,96 @@ async function renderContext() {
 
 function selectTab(name) {
   for (const b of document.querySelectorAll(".tabs button")) b.setAttribute("aria-selected", String(b.dataset.tab === name));
-  for (const t of ["chat", "trace", "context"]) $(`tab-${t}`).hidden = t !== name;
+  for (const t of ["chat", "trace", "context", "reference"]) $(`tab-${t}`).hidden = t !== name;
+  document.querySelector(".layout").classList.toggle("full", name === "reference");
   if (name === "trace") renderTrace();
   if (name === "context") renderContext();
+  if (name === "reference") renderReference();
 }
+
+// --- reference tab ---------------------------------------------------------------------------
+
+let referenceDocs = null;
+
+function argsTable(args) {
+  if (!args.length) return el("p", { class: "muted small", text: "No arguments." });
+  const head = el("tr", {}, ...["Argument", "Type", "Notes"].map((h) => el("th", { text: h })));
+  const rows = args.map((a) => el("tr", {}, el("td", { class: "mono", text: a.name }),
+    el("td", { class: "mono", text: a.type }),
+    el("td", { text: `${a.required ? "required" : "optional"}${a.description ? `. ${a.description}` : ""}` })));
+  return el("div", { class: "table-wrap" }, el("table", {}, el("thead", {}, head), el("tbody", {}, ...rows)));
+}
+
+const commaLinks = (kind, names) => names.flatMap((n, i) => (i ? [", ", refLink(kind, n)] : [refLink(kind, n)]));
+
+function toolEntry(t) {
+  return el("article", { class: "ref-entry", id: `tool-${t.name}` },
+    el("h3", {}, el("code", { text: t.name }), " ", el("a", { class: "anchor", href: refHref("tool", t.name), "data-ref": "", text: "#" })),
+    el("p", { class: "ref-summary", text: t.summary }),
+    el("dl", {}, el("dt", { text: "Used when" }), el("dd", { text: t.when }),
+      el("dt", { text: "Guardrails" }), el("dd", { text: t.guardrails }),
+      t.skills.length ? el("dt", { text: "Mentioned by skills" }) : null,
+      t.skills.length ? el("dd", {}, ...commaLinks("skill", t.skills)) : null),
+    argsTable(t.args),
+    el("p", { class: "muted small" }, "Description shown to the model: ", el("em", { text: t.description })));
+}
+
+function skillEntry(s) {
+  return el("article", { class: "ref-entry", id: `skill-${s.name}` },
+    el("h3", {}, el("code", { text: s.name }), " ", el("a", { class: "anchor", href: refHref("skill", s.name), "data-ref": "", text: "#" })),
+    el("p", { class: "ref-summary", text: s.description }),
+    s.tools_hint.length ? el("p", { class: "small" }, "Tools it leans on: ", ...commaLinks("tool", s.tools_hint)) : null,
+    el("details", {}, el("summary", { text: "Full skill text (what the model reads)" }), el("div", { class: "skill-body", html: renderMarkdown(s.body) })),
+    ...s.references.map((r) => el("details", {}, el("summary", { text: `references/${r.name}` }), el("pre", { text: r.text }))));
+}
+
+async function renderReference() {
+  const root = $("reference");
+  if (!referenceDocs) {
+    try {
+      referenceDocs = await fetch("/api/reference").then((r) => r.json());
+    } catch (err) {
+      root.replaceChildren(el("p", { class: "muted", text: `Could not load the reference: ${err.message}` }));
+      return;
+    }
+    const d = referenceDocs;
+    const toc = el("nav", { class: "ref-toc" },
+      el("strong", { text: "Tools" }), ...d.tools.map((t) => refLink("tool", t.name)),
+      el("strong", { text: "Skills" }), ...d.skills.map((s) => refLink("skill", s.name)));
+    const sections = d.groups.map((g) => el("section", {}, el("h2", { text: g.title }),
+      el("p", { class: "muted", text: g.blurb }), ...d.tools.filter((t) => t.group === g.id).map(toolEntry)));
+    root.replaceChildren(toc, el("div", { class: "ref-body" },
+      el("p", { class: "muted" }, "Everything the agent can call. Names in the Activity feed, Trace and Context tabs link here."),
+      ...sections, el("section", {}, el("h2", { text: "Skills" }),
+        el("p", { class: "muted", text: "Playbooks the agent loads on demand with load_skill. Each arrives as a message, not a tool result." }),
+        ...d.skills.map(skillEntry))));
+  }
+  scrollToRef();
+}
+
+function scrollToRef() {
+  const m = location.hash.match(/^#\/ref\/(tool|skill)\/(.+)$/);
+  document.querySelectorAll(".ref-entry.target").forEach((n) => n.classList.remove("target"));
+  if (!m) return;
+  const node = $(`${m[1]}-${decodeURIComponent(m[2])}`);
+  if (!node) return;
+  node.classList.add("target");
+  node.scrollIntoView({ block: "start" });
+}
+
+function routeHash() {
+  if (/^#\/ref\b/.test(location.hash)) selectTab("reference");
+}
+
+document.addEventListener("click", (ev) => {
+  const a = ev.target.closest("a[data-ref]");
+  if (!a) return;
+  ev.preventDefault();
+  history.pushState(null, "", a.getAttribute("href"));
+  routeHash();
+  if (!$("tab-reference").hidden) scrollToRef();
+});
+window.addEventListener("popstate", routeHash);
 
 window.selectTab = selectTab;
 
@@ -520,3 +636,4 @@ $("replay").onclick = replay;
 
 loadDemo();
 newSession();
+routeHash();
