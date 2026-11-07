@@ -88,14 +88,14 @@ function tally(names) {
   return [...counts].map(([n, k]) => (k > 1 ? `${n} ×${k}` : n)).join(" · ");
 }
 
-async function api(path, body) {
-  const r = await fetch(path, body === undefined ? { method: "POST" } : {
-    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
+async function api(path, body, headers = {}) {
+  const r = await fetch(path, body === undefined ? { method: "POST", headers } : {
+    method: "POST", headers: { ...headers, "Content-Type": "application/json" }, body: JSON.stringify(body),
   });
   if (!r.ok) {
     let detail = r.statusText;
     try { const j = await r.json(); detail = typeof j.detail === "string" ? j.detail : "invalid request"; } catch { /* not JSON */ }
-    throw new Error(detail);
+    throw Object.assign(new Error(detail), { status: r.status });
   }
   return r.json();
 }
@@ -109,7 +109,9 @@ function scrollDown(node) { node.scrollTop = node.scrollHeight; }
 // re-attaches, and this browser keeps a short list of its cases to switch between.
 const CASES_KEY = "cases";
 const MAX_CASES = 12;
-const gone = (sid) => `Case ${sid} isn't on the server any more. Cases live in memory, so a restart clears them.`;
+const gone = (sid) => `Case ${sid} isn't on the server any more. Cases live in memory: a restart, or two idle hours, clears them.`;
+// Opening a case may need an invite code (ADR-0025). It is asked for once and kept here.
+const INVITE_KEY = "invite";
 
 function savedCases() {
   try { return JSON.parse(localStorage.getItem(CASES_KEY)) || []; } catch { return []; }
@@ -177,10 +179,31 @@ async function newCase() {
   if (state.replaying) return;
   const dock = state.dock?.caseId ?? null;
   resetView();
-  const { session_id } = await api("/api/sessions");
+  let session_id;
+  try {
+    ({ session_id } = await openSession());
+  } catch (err) {
+    addEntry("error", err.message);
+    return;
+  }
   setDock(dock);
   rememberCase(session_id, { dock });
   connect(session_id);
+}
+
+async function openSession() {
+  let code;
+  try { code = localStorage.getItem(INVITE_KEY) || ""; } catch { code = ""; }
+  for (;;) {
+    try {
+      return await api("/api/sessions", undefined, code ? { "X-Invite-Code": code } : {});
+    } catch (err) {
+      if (err.status !== 403) throw err;
+      code = (prompt(code ? "That invite code didn't work. Try again:" : "This demo needs an invite code:") || "").trim();
+      if (!code) throw new Error("An invite code is needed to open a case.");
+      try { localStorage.setItem(INVITE_KEY, code); } catch { /* storage blocked: asked again next time */ }
+    }
+  }
 }
 
 // False if the server no longer has the case.

@@ -10,9 +10,10 @@ import httpx
 import pytest
 from langchain_core.messages import AIMessage
 
-from endorsement_agent.api import Session, create_app
-from endorsement_agent.config import Limits
+from endorsement_agent.api import CASE_TTL_S, MakeAgent, Session, create_app
+from endorsement_agent.config import Limits, Quotas
 from endorsement_agent.graph import Agent, build_graph
+from endorsement_agent.quotas import SPENT_CASE, Meter
 from endorsement_agent.skills import SkillLibrary
 from tests.fakes import ScriptedModel, call, calls, runtime
 from tests.test_graph import no_compress
@@ -21,17 +22,18 @@ from tests.test_tools import owner_transfer_ready
 Client = tuple[httpx.AsyncClient, Callable[[str], Session]]
 
 
-def scripted(script: list[AIMessage]) -> Callable[[str], Agent]:
-    def make(case_id: str) -> Agent:
+def scripted(script: list[AIMessage]) -> MakeAgent:
+    def make(case_id: str, meter: Meter) -> Agent:
         rt = runtime(SkillLibrary(), case_id=case_id)
-        graph = build_graph(rt, ScriptedModel(script=script), no_compress, Limits())
+        model = ScriptedModel(script=script, callbacks=[meter])
+        graph = build_graph(rt, model, no_compress, Limits(), stop=meter.stop)
         return Agent(rt, graph, callbacks=[])
 
     return make
 
 
-async def client(script: list[AIMessage]) -> Client:
-    app = create_app(scripted(script))
+async def client(script: list[AIMessage], **quotas: Any) -> Client:
+    app = create_app(scripted(script), Quotas(**quotas))
     http = httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test")
     return http, lambda sid: app.state.sessions[sid]
 
@@ -207,3 +209,107 @@ async def test_context_lists_what_the_model_saw() -> None:
         ("assistant", True),
         ("status", True),
     ]
+
+
+def used(text: str, tokens: int) -> AIMessage:
+    """A reply that reports `tokens` used."""
+    usage = {"input_tokens": tokens, "output_tokens": 0, "total_tokens": tokens}
+    return AIMessage(content=text, usage_metadata=usage)  # type: ignore[arg-type]
+
+
+async def test_a_case_answers_only_to_the_browser_that_opened_it() -> None:
+    http, _ = await client([])
+    r = await http.post("/api/sessions")
+    sid = r.json()["session_id"]
+    assert "httponly" in r.headers["set-cookie"].lower()
+    other = httpx.AsyncClient(transport=http._transport, base_url="http://test")
+    for r in [
+        await other.get(f"/api/sessions/{sid}"),
+        await other.post(f"/api/sessions/{sid}/messages", json={"text": "hi"}),
+        await other.get(f"/api/sessions/{sid}/context"),
+    ]:
+        assert r.status_code == 404
+    assert (await http.get(f"/api/sessions/{sid}")).status_code == 200
+    # the same browser keeps its owner across cases
+    owner = http.cookies["owner"]
+    await new_session(http)
+    assert http.cookies["owner"] == owner
+
+
+async def test_an_invite_code_gates_opening_a_case() -> None:
+    http, _ = await client([], invite_code="sesame")
+    assert (await http.post("/api/sessions")).status_code == 403
+    wrong = await http.post("/api/sessions", headers={"X-Invite-Code": "nope"})
+    assert wrong.status_code == 403
+    ok = await http.post("/api/sessions", headers={"X-Invite-Code": "sesame"})
+    assert ok.status_code == 201
+
+
+async def test_the_switch_off_closes_the_demo() -> None:
+    http, _ = await client([], daily_budget_switch="off")
+    r = await http.post("/api/sessions")
+    assert r.status_code == 503 and "closed" in r.json()["detail"]
+
+
+async def test_an_ip_is_limited_in_cases_it_starts_not_cases_it_opens() -> None:
+    http, session = await client([AIMessage(content=c) for c in "abc"], ip_max_sessions_per_day=2)
+    a, b, c = [await new_session(http) for _ in range(3)]  # opening is free: a bare / opens one
+    hi = {"text": "hi"}
+    for sid in (a, b):
+        assert (await http.post(f"/api/sessions/{sid}/messages", json=hi)).status_code == 202
+        await finish(session(sid))
+    refused = await http.post(f"/api/sessions/{c}/messages", json=hi)
+    assert refused.status_code == 429 and "2 cases" in refused.json()["detail"]
+    # a later message in a started case is not a new case
+    assert (await http.post(f"/api/sessions/{a}/messages", json=hi)).status_code == 202
+    await finish(session(a))
+
+
+async def test_a_case_out_of_tokens_refuses_more_messages() -> None:
+    http, session = await client([used("Hi.", 120)], session_max_tokens=100)
+    sid = await new_session(http)
+    await http.post(f"/api/sessions/{sid}/messages", json={"text": "hi"})
+    await finish(session(sid))
+    assert session(sid).meter.tokens == 120
+    r = await http.post(f"/api/sessions/{sid}/messages", json={"text": "more"})
+    assert r.status_code == 429 and r.json()["detail"] == SPENT_CASE
+
+
+async def test_the_model_call_cap_ends_a_turn_on_a_fixed_reply() -> None:
+    script = [calls(call("get_case", "g1")), AIMessage(content="never reached")]
+    http, session = await client(script, session_max_model_calls=1)
+    sid = await new_session(http)
+    stream = session(sid).stream(0)
+    await until(stream, "status")
+    await http.post(f"/api/sessions/{sid}/messages", json={"text": "hi"})
+    seen = await until(stream, "turn")
+    assert seen[-1]["data"]["reply"] == SPENT_CASE
+    model_calls = [m for m in seen if m["data"].get("type") == "model.called"]
+    assert len(model_calls) == 1  # the capped step made no model call
+    await stream.aclose()
+    await finish(session(sid))
+
+
+async def test_the_daily_budget_counts_every_case() -> None:
+    http, session = await client([used("a", 60), used("b", 60)], daily_max_tokens=100)
+    first = await new_session(http)
+    await http.post(f"/api/sessions/{first}/messages", json={"text": "hi"})
+    await finish(session(first))
+    second = await new_session(http)
+    await http.post(f"/api/sessions/{second}/messages", json={"text": "hi"})
+    await finish(session(second))
+    r = await http.post("/api/sessions")
+    assert r.status_code == 503 and "today" in r.json()["detail"]
+
+
+async def test_idle_cases_are_dropped_and_live_cases_are_capped(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr("endorsement_agent.api.MAX_LIVE_CASES", 2)
+    http, session = await client([])
+    old, live = await new_session(http), await new_session(http)
+    assert (await http.post("/api/sessions")).status_code == 503
+    session(old).last_active -= CASE_TTL_S + 1
+    await new_session(http)  # the idle one made room
+    assert (await http.get(f"/api/sessions/{old}")).status_code == 404
+    assert (await http.get(f"/api/sessions/{live}")).status_code == 200

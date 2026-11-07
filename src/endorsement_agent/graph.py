@@ -34,6 +34,7 @@ from endorsement_agent import tools
 from endorsement_agent.config import Limits
 from endorsement_agent.events import (
     AssistantMessaged,
+    CaseEvent,
     ContextCompressed,
     ImageStubbed,
     ModelCalled,
@@ -72,13 +73,42 @@ def tool_calls_this_turn(messages: Sequence[BaseMessage]) -> int:
     return count
 
 
+def with_breakpoint(m: BaseMessage) -> BaseMessage:
+    """A copy of `m` whose last content block ends a cacheable prefix (ADR-0026)."""
+    if not m.content:
+        return m
+    content = m.content
+    blocks: list[Any] = (
+        [{"type": "text", "text": content}]
+        if isinstance(content, str)
+        else [b if isinstance(b, dict) else {"type": "text", "text": b} for b in content]
+    )
+    blocks[-1] = {**blocks[-1], "prompt_cache_breakpoint": {"mode": "explicit"}}
+    return m.model_copy(update={"content": blocks})
+
+
+def mark_breakpoints(messages: Sequence[BaseMessage]) -> list[BaseMessage]:
+    """Mark where each earlier call's history ended (before each assistant message) and the
+    last message, so every call places the same breakpoints. Assistant messages never."""
+    out = []
+    for i, m in enumerate(messages):
+        ended = i == len(messages) - 1 or isinstance(messages[i + 1], AIMessage)
+        out.append(with_breakpoint(m) if ended and not isinstance(m, AIMessage) else m)
+    return out
+
+
 def model_input(
-    messages: Sequence[BaseMessage], rt: Runtime, cap: int | None = None
+    messages: Sequence[BaseMessage],
+    rt: Runtime,
+    cap: int | None = None,
+    breakpoints: bool = False,
 ) -> list[BaseMessage]:
     """What one model call sees. The status bar goes last and is not stored.
 
     `cap` is set when this turn's tool-call cap is reached: the bar then says so, so the
     model explains the pause instead of inventing a reason it cannot act (ADR-0019).
+    `breakpoints` marks explicit cache breakpoints for GPT-5.6 deployments (ADR-0026); the
+    bar stays unmarked.
     """
     text = to_text(render_status(rt.case, rt.today()))
     if cap is not None:
@@ -86,7 +116,10 @@ def model_input(
             f"\nturn: tool-call cap reached ({cap}/{cap}); no tools until the user's next"
             " message. Say what you will do next; it continues when they reply."
         )
-    return [SystemMessage(SYSTEM_PROMPT), *messages, HumanMessage(text)]
+    system: BaseMessage = SystemMessage(SYSTEM_PROMPT)
+    if breakpoints:
+        system, messages = with_breakpoint(system), mark_breakpoints(messages)
+    return [system, *messages, HumanMessage(text)]
 
 
 def build_graph(
@@ -95,7 +128,11 @@ def build_graph(
     compressor: Compressor,
     limits: Limits,
     checkpointer: InMemorySaver | None = None,
+    stop: Callable[[Sequence[CaseEvent]], str | None] | None = None,
+    cache_breakpoints: bool = False,
 ) -> CompiledStateGraph[Any]:
+    """`stop` gives a reason when usage limits end the case (ADR-0025); the turn then ends on
+    that text as the reply, with no model call. `cache_breakpoints`: see `model_input`."""
     definitions = tools.definitions(rt.skills)
     with_tools = model.bind_tools(definitions)
     # Past the per-turn cap the model keeps its tool definitions (cache) but must reply.
@@ -103,10 +140,14 @@ def build_graph(
 
     async def agent(state: MessagesState) -> dict[str, list[BaseMessage]]:
         messages = state["messages"]
+        if stop is not None and (reason := stop(rt.events())):
+            rt.emit(AssistantMessaged(text=reason))
+            return {"messages": [AIMessage(content=reason)]}
         capped = tool_calls_this_turn(messages) >= limits.max_tool_calls_per_turn
         started = time.monotonic()
         cap = limits.max_tool_calls_per_turn if capped else None
-        reply = await (reply_only if capped else with_tools).ainvoke(model_input(messages, rt, cap))
+        prompt = model_input(messages, rt, cap, cache_breakpoints)
+        reply = await (reply_only if capped else with_tools).ainvoke(prompt)
         assert isinstance(reply, AIMessage)
         usage = reply.usage_metadata
         rt.emit(

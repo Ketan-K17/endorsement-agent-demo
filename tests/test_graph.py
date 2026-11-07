@@ -236,3 +236,40 @@ async def test_tool_called_is_not_repeated_on_resume(rt: Runtime) -> None:
     await a.resume({"decision": "approved"})
     called = [e.call_id for e in rt.events() if isinstance(e, ToolCalled)]
     assert called == ["v1", "a1"]
+
+
+def marked(m: Any) -> bool:
+    return isinstance(m.content, list) and "prompt_cache_breakpoint" in m.content[-1]
+
+
+async def test_cache_breakpoints_keep_each_earlier_prompt_as_a_marked_prefix(
+    rt: Runtime,
+) -> None:
+    model = ScriptedModel(
+        script=[
+            calls(call("get_case", "g1")),
+            calls(call("get_case", "g2"), call("get_case", "g3")),
+            AIMessage(content="Done."),
+            AIMessage(content="Again."),
+        ]
+    )
+    a = Agent(rt, build_graph(rt, model, no_compress, Limits(), cache_breakpoints=True), [])
+    await a.send("hi")
+    await a.send("and now?")
+    prompts = model.prompts
+    assert len(prompts) == 4
+    for earlier, later in zip(prompts, prompts[1:], strict=False):
+        # everything before the earlier bar is unchanged in the later call, marks included,
+        # so the earlier call's last breakpoint matches the cache
+        assert later[: len(earlier) - 1] == earlier[:-1]
+        assert marked(earlier[-2])
+    for p in prompts:
+        assert marked(p[0]) and not marked(p[-1])  # system marked; the status bar never
+        assert not any(marked(m) for m in p if isinstance(m, AIMessage))
+    assert not any(marked(m) for m in a.messages())  # marks are never stored
+
+
+async def test_no_breakpoints_by_default(rt: Runtime) -> None:
+    a, model = agent(rt, [AIMessage(content="Hello!")])
+    await a.send("hi")
+    assert not any(marked(m) for m in model.prompts[0])
