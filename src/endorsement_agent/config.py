@@ -37,7 +37,7 @@ def fixed_today() -> date | None:
 class Limits(BaseModel):
     compress_threshold: int = 5
     ask_budget: int = 3
-    max_tool_calls_per_turn: int = 12
+    max_tool_calls_per_turn: int = 40
 
     @classmethod
     def from_env(cls) -> Limits:

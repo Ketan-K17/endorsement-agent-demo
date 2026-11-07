@@ -129,6 +129,8 @@ async def test_tool_call_cap_refuses_excess_and_forces_reply(rt: Runtime) -> Non
     assert contents[2].startswith("refused: tool-call cap (2)")
     assert model.call_kwargs[0].get("tool_choice_marker") is None
     assert model.call_kwargs[1]["tool_choice_marker"] == "none"
+    assert "tool-call cap" not in str(model.prompts[0][-1].content)
+    assert "turn: tool-call cap reached (2/2)" in str(model.prompts[1][-1].content)
 
 
 async def test_compression_runs_in_loop(rt: Runtime) -> None:

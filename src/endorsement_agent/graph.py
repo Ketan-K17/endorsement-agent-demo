@@ -72,10 +72,21 @@ def tool_calls_this_turn(messages: Sequence[BaseMessage]) -> int:
     return count
 
 
-def model_input(messages: Sequence[BaseMessage], rt: Runtime) -> list[BaseMessage]:
-    """What one model call sees. The status bar goes last and is not stored."""
-    bar = HumanMessage(to_text(render_status(rt.case, rt.today())))
-    return [SystemMessage(SYSTEM_PROMPT), *messages, bar]
+def model_input(
+    messages: Sequence[BaseMessage], rt: Runtime, cap: int | None = None
+) -> list[BaseMessage]:
+    """What one model call sees. The status bar goes last and is not stored.
+
+    `cap` is set when this turn's tool-call cap is reached: the bar then says so, so the
+    model explains the pause instead of inventing a reason it cannot act (ADR-0019).
+    """
+    text = to_text(render_status(rt.case, rt.today()))
+    if cap is not None:
+        text += (
+            f"\nturn: tool-call cap reached ({cap}/{cap}); no tools until the user's next"
+            " message. Say what you will do next; it continues when they reply."
+        )
+    return [SystemMessage(SYSTEM_PROMPT), *messages, HumanMessage(text)]
 
 
 def build_graph(
@@ -94,7 +105,8 @@ def build_graph(
         messages = state["messages"]
         capped = tool_calls_this_turn(messages) >= limits.max_tool_calls_per_turn
         started = time.monotonic()
-        reply = await (reply_only if capped else with_tools).ainvoke(model_input(messages, rt))
+        cap = limits.max_tool_calls_per_turn if capped else None
+        reply = await (reply_only if capped else with_tools).ainvoke(model_input(messages, rt, cap))
         assert isinstance(reply, AIMessage)
         usage = reply.usage_metadata
         rt.emit(

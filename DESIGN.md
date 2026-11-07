@@ -129,7 +129,7 @@ Fields: `today` (passed in; dynamic facts belong here, not in the static prefix)
 Stages, computed from state in order (never stored):
 Intake (no change request yet) → Docs (required docs not all `accepted`) → Validate (all docs in, no passing verdict) → Approval (verdict passes, no decision) → Insurer (approved, not issued) → Done. Handover applies at any point.
 
-Guardrail defaults (config): ask budget 3 per case; 12 tool calls per turn; `validate_case` is forced before `request_approval`.
+Guardrail defaults (config): ask budget 3 per case; 40 tool calls per turn (ADR-0019); `validate_case` is forced before `request_approval`.
 
 ## 9. Approval (interactive)
 

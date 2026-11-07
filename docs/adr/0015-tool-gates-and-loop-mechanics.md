@@ -11,7 +11,7 @@ Status: accepted (doc verdicts, validation scope, skill messages, short results 
 - **`lookup_policy` selects the policy only on a single match.** Several matches are listed for the user to choose from; no `select_policy` tool.
 - **Refusals are tool results** (`refused: …`, `error: …`), never exceptions, so the model can recover.
 - **Approval interrupt and re-run.** LangGraph re-runs the tool node on resume. Calls already recorded as `tool.result` reuse their stored result; a pending approval is not requested twice. Parallel calls run first, then the approval.
-- **Tool-call cap.** Calls beyond `MAX_TOOL_CALLS_PER_TURN` are refused; the next model call keeps the tool definitions (cache) but sets `tool_choice="none"`.
+- **Tool-call cap.** Calls beyond `MAX_TOOL_CALLS_PER_TURN` are refused; the next model call keeps the tool definitions (cache) but sets `tool_choice="none"`. Default and the status-bar warning: ADR-0019.
 - **Originals in the event log.** `tool.result` carries the raw result; `context.compressed` carries each stub; `history.image_stubbed` records each stubbed upload; `insurer.responded` records query answers.
 - **Uploads** are one user message each, id `upload-<doc_id>`, which is how stubbing finds them.
 - **Token counts** for the compression chip are a 4-chars-per-token estimate.
