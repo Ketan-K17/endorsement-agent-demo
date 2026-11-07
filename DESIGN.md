@@ -27,7 +27,7 @@ A portfolio demo of an agentic (non-deterministic) insurance-endorsement assista
 
 - Four roles only: `system`, `user`, `assistant`, `tool`. History is stored in LangChain's message format, so it is forced into a compatible shape. A tool call is not a separate message: an `assistant` message has two fields, `content` and `tool_calls`. When the agent calls tools, `content` is empty and `tool_calls` is non-empty; when it replies in text, `content` is filled and `tool_calls` is empty. Each call's output comes back as a `tool` message (LangChain `ToolMessage`).
 - The status bar is appended as a final `user` message (for now) so it fits the four-role format. It is built per call and **never persisted** to history or the checkpointer, so stale copies cannot exist.
-- Because everything above the bar only grows (or changes at compression events), the provider-side prefix cache stays warm.
+- Because everything above the bar only grows (or changes at compression events), the provider-side prefix cache stays warm. The GPT-5.6 agent caches only at explicit breakpoints, so `model_input` marks the system message and where each earlier call's history ended; the bar stays unmarked (ADR-0026).
 - **Skill catalog placement:** inside the `load_skill` tool definition (an enum of skill names plus a one-line "use when…" per skill, generated from `SKILL.md` frontmatter at startup). It is part of the static prefix, sits next to the tool that uses it, and keeps the system prompt to SOP and guidelines. See ADR-0002.
 
 ## 3. Case File (typed state)
@@ -181,7 +181,8 @@ Single static page in the Case Desk style (ADR-0021): chat pad with inline tool 
 ## 15. Latency, limits and abuse controls
 
 - Target under 90 seconds per user turn. Parallel tool calls enabled (documents classified and extracted concurrently); every tool event is streamed with timing.
-- Per session: 60 model calls and 150k tokens. Per IP: 3 sessions per day. A global daily budget switch. When a cap trips, the UI says so and offers a pre-recorded run.
+- Per session: 60 agent model calls and 100k tokens across all four roles, not counting cache reads (ADR-0026). Per IP: 3 started cases per day. A global daily token budget and an on/off switch. When a cap trips, the turn ends on a fixed reply and the UI says so; the pre-recorded run is deferred (ADR-0025).
+- A case answers only to the browser that opened it (an `owner` cookie). At most 40 live cases; idle ones are dropped after 2 hours.
 - An optional invite code (env var) opens or closes access without a redeploy.
 
 ## 16. Events and replay
