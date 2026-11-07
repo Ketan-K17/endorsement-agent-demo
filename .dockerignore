@@ -1,0 +1,8 @@
+# Allow-list: only what the image needs. Keeps .env and private_docs/ out of every build.
+*
+!pyproject.toml
+!uv.lock
+!src/
+!skills/
+!fixtures/documents/
+**/__pycache__

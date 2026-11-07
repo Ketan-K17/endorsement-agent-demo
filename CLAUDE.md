@@ -44,7 +44,7 @@ Portfolio demo of an agentic insurance-endorsement assistant. Performative, not 
 
 ## Environment variables
 
-Names only; values in `.env` (see `.env.example`). Per role `<ROLE>` ∈ `AGENT`, `EXTRACTOR`, `COMPRESSOR`, `JUDGE`: `<ROLE>_ENDPOINT`, `<ROLE>_API_KEY`, `<ROLE>_DEPLOYMENT`, `<ROLE>_API_VERSION`. Plus `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY`, `LANGFUSE_HOST`, `COMPRESS_THRESHOLD`, `ASK_BUDGET`, `MAX_TOOL_CALLS_PER_TURN`, `SESSION_MAX_MODEL_CALLS`, `SESSION_MAX_TOKENS`, `IP_MAX_SESSIONS_PER_DAY`, `DAILY_MAX_TOKENS`, `DAILY_BUDGET_SWITCH`, `INVITE_CODE`, `FIXED_TODAY` (optional).
+Names only; values in `.env` (see `.env.example`). Per role `<ROLE>` ∈ `AGENT`, `EXTRACTOR`, `COMPRESSOR`, `JUDGE`: `<ROLE>_ENDPOINT`, `<ROLE>_API_KEY`, `<ROLE>_DEPLOYMENT`, `<ROLE>_API_VERSION`. Plus `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY`, `LANGFUSE_HOST`, `COMPRESS_THRESHOLD`, `ASK_BUDGET`, `MAX_TOOL_CALLS_PER_TURN`, `SESSION_MAX_MODEL_CALLS`, `SESSION_MAX_TOKENS`, `IP_MAX_SESSIONS_PER_DAY`, `DAILY_MAX_TOKENS`, `DAILY_BUDGET_SWITCH`, `INVITE_CODE`, `CLIENT_IP_HEADER` (ADR-0027), `FIXED_TODAY` (optional).
 
 Model assignment (ADR-0007): agent `gpt-5.6-sol` (India resource); extractor `gpt-5.4-mini`, compressor `gpt-5.4-nano`, judge `gpt-5` (US resource). Check availability and capabilities with `tools/probe_models.py`.
 
@@ -66,7 +66,7 @@ Update this block when a step finishes.
 - [ ] 6. Evals + nightly runs
 - [ ] 7a. Usage limits and case owners (ADR-0025): unit-tested; awaiting a live check by the user. Docker and the Render deploy come next
 - [x] 7b. Explicit cache breakpoints on the agent (ADR-0026): live-checked on case-e32750e8 (agent cache writes 57k → 4.6k vs case-60cbc143). Image-bearing calls get no breakpoint writes
-- [ ] 7. Deploy to Render with limits (ADR-0024; needs credentials sign-off)
+- [ ] 7. Deploy to Render with limits (ADR-0024; needs credentials sign-off). `Dockerfile`, `.dockerignore`, `render.yaml` and the client-IP header written (ADR-0027, proposed); image not yet built, not yet deployed
 
 ## Waiting on the user
 

@@ -58,3 +58,4 @@ class Quotas(_FromEnv):
     daily_max_tokens: int = 3_000_000
     daily_budget_switch: bool = True  # off closes the demo
     invite_code: SecretStr | None = None
+    client_ip_header: str | None = None  # set only behind a proxy that overwrites it (ADR-0027)

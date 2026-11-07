@@ -1,0 +1,55 @@
+# Render Blueprint (ADR-0024, ADR-0027). `sync: false` values are asked for once, when the
+# Blueprint is created, and are never stored here. Limits not listed keep the app's defaults.
+services:
+  - type: web
+    name: endorsement-agent
+    runtime: docker
+    plan: free
+    region: singapore
+    healthCheckPath: /
+    autoDeployTrigger: "off"
+    envVars:
+      - key: AGENT_ENDPOINT
+        sync: false
+      - key: AGENT_API_KEY
+        sync: false
+      - key: AGENT_DEPLOYMENT
+        value: gpt-5.6-sol
+      - key: AGENT_API_VERSION
+        value: 2025-04-01-preview
+      - key: EXTRACTOR_ENDPOINT
+        sync: false
+      - key: EXTRACTOR_API_KEY
+        sync: false
+      - key: EXTRACTOR_DEPLOYMENT
+        value: gpt-5.4-mini
+      - key: EXTRACTOR_API_VERSION
+        value: 2025-04-01-preview
+      - key: COMPRESSOR_ENDPOINT
+        sync: false
+      - key: COMPRESSOR_API_KEY
+        sync: false
+      - key: COMPRESSOR_DEPLOYMENT
+        value: gpt-5.4-nano
+      - key: COMPRESSOR_API_VERSION
+        value: 2025-04-01-preview
+      - key: JUDGE_ENDPOINT
+        sync: false
+      - key: JUDGE_API_KEY
+        sync: false
+      - key: JUDGE_DEPLOYMENT
+        value: gpt-5
+      - key: JUDGE_API_VERSION
+        value: 2025-04-01-preview
+      - key: LANGFUSE_PUBLIC_KEY
+        sync: false
+      - key: LANGFUSE_SECRET_KEY
+        sync: false
+      - key: LANGFUSE_HOST
+        value: https://cloud.langfuse.com
+      - key: INVITE_CODE
+        sync: false
+      - key: CLIENT_IP_HEADER
+        value: cf-connecting-ip
+      - key: FIXED_TODAY
+        value: "2026-10-15"

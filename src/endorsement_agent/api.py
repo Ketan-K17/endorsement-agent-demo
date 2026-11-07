@@ -213,8 +213,11 @@ class MessageIn(BaseModel):
     files: list[FileIn] = Field(default_factory=list, max_length=12)
 
 
-def client_ip(request: Request) -> str:
-    """The peer address. Behind a proxy, uvicorn must trust its forwarded headers (ADR-0025)."""
+def client_ip(request: Request, header: str | None) -> str:
+    """The visitor's address: `header` when set and present (ADR-0027), else the peer.
+    Never `X-Forwarded-For`, whose first entry a visitor can forge on Render."""
+    if header and (value := request.headers.get(header)):
+        return value.strip()
     return request.client.host if request.client else "unknown"
 
 
@@ -322,7 +325,7 @@ def create_app(make_agent: MakeAgent | None = None, quotas: Quotas | None = None
         if reason := s.meter.stop(s.rt.events()):
             raise HTTPException(429, reason)
         if not s.started:
-            if refusal := gate.start(client_ip(request)):
+            if refusal := gate.start(client_ip(request, gate.quotas.client_ip_header)):
                 raise HTTPException(refusal.status, refusal.detail)
             s.started = True
         uploads = [s.rt.add_upload(f.filename, f.mime, f.data) for f in body.files]

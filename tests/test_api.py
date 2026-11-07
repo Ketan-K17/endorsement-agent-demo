@@ -265,6 +265,26 @@ async def test_an_ip_is_limited_in_cases_it_starts_not_cases_it_opens() -> None:
     await finish(session(a))
 
 
+async def test_the_ip_comes_from_the_configured_header_not_x_forwarded_for() -> None:
+    http, session = await client(
+        [AIMessage(content=c) for c in "ab"],
+        ip_max_sessions_per_day=1,
+        client_ip_header="cf-connecting-ip",
+    )
+    a, b, c = [await new_session(http) for _ in range(3)]
+
+    async def send(sid: str, ip: str, forged: str) -> int:
+        headers = {"CF-Connecting-IP": ip, "X-Forwarded-For": forged}
+        r = await http.post(f"/api/sessions/{sid}/messages", json={"text": "hi"}, headers=headers)
+        if r.status_code == 202:
+            await finish(session(sid))
+        return r.status_code
+
+    assert await send(a, "203.0.113.1", "198.51.100.1") == 202
+    assert await send(b, "203.0.113.1", "198.51.100.2") == 429  # a new forged XFF does not help
+    assert await send(c, "203.0.113.2", "198.51.100.1") == 202
+
+
 async def test_a_case_out_of_tokens_refuses_more_messages() -> None:
     http, session = await client([used("Hi.", 120)], session_max_tokens=100)
     sid = await new_session(http)
