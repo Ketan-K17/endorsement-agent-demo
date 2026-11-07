@@ -62,6 +62,7 @@ Update this block when a step finishes.
 - [ ] 5c. Case Desk UI restyle (ADR-0021): ruled chat pad, flight recorder, in-tray, case file; awaiting a browser check by the user
 - [ ] 5d. Revisit cases in a sitting and survive reloads (ADR-0022): `?case=` URL, header case picker; awaiting a browser check by the user
 - [ ] 5e. Documents in parts (ADR-0023): Aadhaar front/back, policy copy both pages enforced; handover moves the assignee to the team. Unit-tested; awaiting a live check by the user
+- [ ] 5f. Drop the flight recorder; Agent placeholder with cycling phrases while it works (ADR-0025); awaiting a browser check by the user
 - [ ] 6. Evals + nightly runs
 - [ ] 7a. Usage limits and case owners (ADR-0025): unit-tested; awaiting a live check by the user. Docker and the Render deploy come next
 - [x] 7b. Explicit cache breakpoints on the agent (ADR-0026): live-checked on case-e32750e8 (agent cache writes 57k → 4.6k vs case-60cbc143). Image-bearing calls get no breakpoint writes
