@@ -10,8 +10,9 @@ const state = {
   source: null,
   events: [],
   lastSeq: 0,
-  draft: null,          // the assistant bubble receiving tokens
-  feedRows: new Map(),  // call_id -> feed row
+  draft: null,          // the assistant entry's text receiving tokens
+  note: null,           // the margin note collecting the current model step's tool calls
+  calls: new Map(),     // call_id -> {line, node} in a margin note
   attachments: [],      // {filename, mime, data (base64), dock (doc name if it came from the dock)}
   dock: null,           // {caseId, docs: [{name, sent}]}: the demo case's documents, added at will
   busy: false,
@@ -70,6 +71,21 @@ const skillOf = (tool, args) => (tool === "load_skill" ? args?.name : tool === "
 const ms = (a, b) => new Date(b) - new Date(a);
 const secs = (n) => (n >= 1000 ? `${(n / 1000).toFixed(1)}s` : `${n}ms`);
 const short = (v, n = 60) => { const s = typeof v === "string" ? v : JSON.stringify(v); return s.length > n ? s.slice(0, n - 1) + "…" : s; };
+const clock = (ts) => new Date(ts ?? Date.now()).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+const mmss = (n) => { const s = Math.max(0, Math.round(n / 1000)); return `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`; };
+const kTok = (n) => `${(n / 1000).toFixed(1)}k`;
+const isRefused = (content) => /^(refused|error)/.test(content);
+const docName = (id, events) => events.find((x) => x.type === "document.uploaded" && x.doc_id === id)?.filename || id;
+
+// Tools that mark a turning point: a red dot in the recorder, a highlight on the margin note.
+const MARKS = new Set(["ask_user", "request_approval", "handover", "submit_to_insurer", "respond_to_insurer"]);
+
+// "classify_document ×2 · extract_fields": names in call order, repeats counted.
+function tally(names) {
+  const counts = new Map();
+  for (const n of names) counts.set(n, (counts.get(n) || 0) + 1);
+  return [...counts].map(([n, k]) => (k > 1 ? `${n} ×${k}` : n)).join(" · ");
+}
 
 async function api(path, body) {
   const r = await fetch(path, body === undefined ? { method: "POST" } : {
@@ -89,12 +105,16 @@ function scrollDown(node) { node.scrollTop = node.scrollHeight; }
 
 async function newSession() {
   if (state.source) state.source.close();
-  Object.assign(state, { events: [], lastSeq: 0, draft: null, busy: false, attachments: [], submitted: null });
-  state.feedRows.clear();
+  Object.assign(state, { events: [], lastSeq: 0, draft: null, note: null, busy: false, attachments: [], submitted: null });
+  state.calls.clear();
   if (state.dock) for (const d of state.dock.docs) d.sent = false;  // a new case has seen none of them
   renderDock();
   for (const id of ["chat", "feed", "trace", "context"]) $(id).replaceChildren();
   $("approval").hidden = true;
+  $("pad-title").textContent = "Case notes";
+  $("pad-date").textContent = new Date().toLocaleDateString([], { weekday: "short", day: "numeric", month: "short", year: "numeric" });
+  $("recorder-clock").textContent = "";
+  renderSlots([]);
   renderAttachments();
   const { session_id } = await api("/api/sessions");
   state.sid = session_id;
@@ -105,7 +125,7 @@ async function newSession() {
   source.addEventListener("status", (m) => renderStatus(JSON.parse(m.data)));
   source.addEventListener("turn", (m) => onTurn(JSON.parse(m.data)));
   source.addEventListener("agent_error", (m) => {
-    addBubble("error", JSON.parse(m.data).message);
+    addEntry("error", JSON.parse(m.data).message);
     state.draft = null;
   });
   state.source = source;
@@ -118,53 +138,44 @@ function onCaseEvent(e) {
   state.lastSeq = e.seq;
   state.events.push(e);
   if (e.type === "insurer.submitted") state.submitted = e.ref;
-  if (!state.replaying) showEvent(e, state.events);
+  if (e.type === "policy.selected") $("pad-title").textContent = `Case notes · ${e.policy.policy_no}`;
+  if (e.type === "slot.recorded" || e.type === "document.uploaded") renderSlots(state.events);
+  if (!state.replaying) {
+    showEvent(e, state.events);
+    renderRecorder(state.events);
+  }
   if (!$("tab-trace").hidden) renderTrace();
 }
 
 function showEvent(e, events) {
   switch (e.type) {
-    case "message.user": {
-      const names = e.doc_ids.map((id) => events.find((x) => x.type === "document.uploaded" && x.doc_id === id)?.filename || id);
-      addBubble("user", e.text, names);
+    case "message.user":
+      state.note = null;
+      addEntry("user", e.text, e.doc_ids.map((id) => docName(id, events)), false, e.ts);
       break;
-    }
     case "message.assistant":
+      state.note = null;
       if (state.draft) {
         state.draft.classList.remove("streaming");
         state.draft.innerHTML = renderMarkdown(e.text);
         state.draft = null;
-      } else addBubble("assistant", e.text);
+      } else addEntry("assistant", e.text, [], false, e.ts);
       break;
-    case "tool.called": {
-      const row = feedRow(e.tool, short(e.args, 40), "running", "running", true);
-      state.feedRows.set(e.call_id, { row, ts: e.ts });
+    case "model.called":
+      state.note = null;  // the next tool calls belong to a new step
       break;
-    }
-    case "tool.result": {
-      const entry = state.feedRows.get(e.call_id);
-      if (!entry) break;
-      entry.row.className = /^(refused|error)/.test(e.content) ? "refused" : "";
-      entry.row.querySelector(".time").textContent = secs(ms(entry.ts, e.ts));
+    case "tool.called":
+      noteCall(e);
       break;
-    }
-    case "model.called": {
-      const tokens = e.input_tokens != null ? ` · ${e.input_tokens}→${e.output_tokens} tok` : "";
-      feedRow("model", e.tool_calls ? `${e.tool_calls} tool call(s)` : "reply", secs(e.duration_ms) + tokens, "model");
-      break;
-    }
-    case "context.compressed":
-      feedRow("compressed", `${e.call_ids.length} results, ${(e.tokens_before / 1000).toFixed(1)}k → ${(e.tokens_after / 1000).toFixed(1)}k tokens`, "", "compressed");
-      break;
-    case "history.image_stubbed":
-      feedRow("image stubbed", e.doc_id, "", "compressed");
+    case "tool.result":
+      noteResult(e);
       break;
   }
 }
 
 function onToken(text) {
   if (state.replaying) return;
-  if (!state.draft) state.draft = addBubble("assistant", "", [], true);
+  if (!state.draft) state.draft = addEntry("assistant", "", [], true);
   state.draft.textContent += text;
   scrollDown($("chat"));
 }
@@ -177,24 +188,141 @@ function onTurn(turn) {
 
 // --- chat ------------------------------------------------------------------------------------
 
-function addBubble(kind, text, files = [], streaming = false) {
-  const bubble = el("div", { class: `bubble ${kind}${streaming ? " streaming" : ""}` });
-  if (kind === "assistant" && !streaming) bubble.innerHTML = renderMarkdown(text);
-  else bubble.textContent = text;
-  if (files.length) bubble.append(el("span", { class: "files", text: `📎 ${files.join(", ")}` }));
-  $("chat").append(bubble);
+// The conversation is one ruled pad (ADR-0021): who and when in the margin, the words on the lines.
+const WHO = { user: "You", assistant: "Agent", error: "Error" };
+
+function addEntry(kind, text, files = [], streaming = false, ts = null) {
+  const body = el("div", { class: `text${streaming ? " streaming" : ""}` });
+  if (kind === "assistant" && !streaming) body.innerHTML = renderMarkdown(text);
+  else body.textContent = text;
+  if (files.length) body.append(el("span", { class: "files", text: `📎 ${files.join(" · ")}` }));
+  $("chat").append(el("div", { class: `entry ${kind}` },
+    el("div", { class: "who" }, WHO[kind], el("time", { text: clock(ts) })), body));
   scrollDown($("chat"));
-  return bubble;
+  return body;
 }
 
-function feedRow(name, detail, time, cls, link = null) {
-  const label = link ? refLink("tool", name) : name;
-  const row = el("li", { class: cls },
-    el("span", { class: "name" }, label, detail ? ` ${detail}` : null),
-    el("span", { class: "time", text: time }));
-  $("feed").append(row);
-  scrollDown($("feed"));
-  return row;
+// One margin note per model step: its tool calls folded to a line, unfolding to args and results.
+function noteCall(e) {
+  if (!state.note) {
+    const who = el("div", { class: "who" });
+    const label = el("span");
+    const calls = el("div", { class: "calls" });
+    const node = el("div", { class: "entry note" }, who,
+      el("div", { class: "text" }, el("details", {}, el("summary", {}, label), calls)));
+    $("chat").append(node);
+    state.note = { node, who, label, calls, names: [] };
+  }
+  const n = state.note;
+  n.names.push(e.tool);
+  n.who.textContent = `→ ${n.names.length} call${n.names.length > 1 ? "s" : ""}`;
+  n.label.textContent = tally(n.names);
+  if (MARKS.has(e.tool)) n.node.classList.add("flag");
+  const line = el("div", { class: "call" }, refLink("tool", e.tool), `(${short(e.args, 70)})`);
+  n.calls.append(line);
+  state.calls.set(e.call_id, { line, node: n.node });
+  scrollDown($("chat"));
+}
+
+function noteResult(e) {
+  const c = state.calls.get(e.call_id);
+  if (!c) return;
+  c.line.append(`\n  → ${short(e.content, 120)}`);
+  if (isRefused(e.content)) {
+    c.line.classList.add("refused");
+    c.node.classList.add("flag");
+  }
+}
+
+// --- flight recorder -------------------------------------------------------------------------
+
+// Rebuilt from the events on every change, so replay drives it too. One row shape for every
+// step: routine calls in one model step fold into a row, changes get a row each, turning
+// points a red dot.
+const SOLO = new Set(["record_slot", "record_change_request", "waive_requirement", "validate_case"]);
+
+function stepDetail(e, r, events) {
+  const a = e.args || {};
+  if (!r) return "running…";
+  if (isRefused(r.content)) return short(r.content, 60);
+  switch (e.tool) {
+    case "record_slot": return `${a.name} → ${short(a.value, 40)}`;
+    case "record_change_request": return `change → ${a.type}`;
+    case "waive_requirement": return `waived ${a.name}`;
+    case "ask_user": return short((a.questions || [])[0] || "", 60);
+    case "handover": return `${a.team} · ${a.severity}`;
+    case "request_approval":
+      return events.some((x) => x.type === "approval.decided" && x.seq > e.seq) ? "sent for approval" : "waiting for you";
+    case "validate_case":
+    case "submit_to_insurer":
+      return short(r.content, 50);
+    default: return null;
+  }
+}
+
+function recRow(cls, time, step, detail = null) {
+  return el("li", { class: cls }, el("time", { text: time }),
+    el("span", { class: "step" }, step, detail ? el("small", { text: detail }) : null));
+}
+
+function renderRecorder(events) {
+  const start = events[0]?.ts;
+  const at = (e) => (start ? mmss(ms(start, e.ts)) : "");
+  const results = new Map(events.filter((e) => e.type === "tool.result").map((e) => [e.call_id, e]));
+  const rows = [];
+  let run = [];
+  let turn = 0;
+  const flush = () => {
+    const running = run.some((e) => !results.has(e.call_id)) ? "running" : "";
+    if (run.length === 1) rows.push(recRow(running, at(run[0]), refLink("tool", run[0].tool), stepDetail(run[0], results.get(run[0].call_id), events)));
+    else if (run.length) {
+      const names = tally(run.map((e) => e.tool));
+      rows.push(recRow(running, at(run[0]), el("details", {}, el("summary", { text: `${run.length} steps` }), el("small", { text: names }))));
+    }
+    run = [];
+  };
+  for (const e of events) {
+    switch (e.type) {
+      case "message.user": {
+        flush();
+        turn += 1;
+        const n = e.doc_ids.length;
+        rows.push(recRow("turn", at(e), `turn ${turn} · ${n ? `${n} document${n > 1 ? "s" : ""}` : turn === 1 ? "you wrote" : "you replied"}`));
+        break;
+      }
+      case "model.called":
+        flush();
+        break;
+      case "tool.called": {
+        const r = results.get(e.call_id);
+        const mark = MARKS.has(e.tool) || (r && isRefused(r.content));
+        if (!mark && !SOLO.has(e.tool)) { run.push(e); break; }
+        flush();
+        rows.push(recRow(`${mark ? "mark" : ""}${r ? "" : " running"}`, at(e), refLink("tool", e.tool), stepDetail(e, r, events)));
+        break;
+      }
+      case "context.compressed":
+        flush();
+        rows.push(recRow("faded", at(e), `compressed ${e.call_ids.length} results`, `${kTok(e.tokens_before)} → ${kTok(e.tokens_after)} tokens`));
+        break;
+      case "history.image_stubbed":
+        flush();
+        rows.push(recRow("faded", at(e), "image stubbed", docName(e.doc_id, events)));
+        break;
+      case "approval.decided":
+        flush();
+        rows.push(recRow("mark", at(e), `approval ${e.status}`, e.reason));
+        break;
+      case "insurer.updated":
+        flush();
+        rows.push(recRow("", at(e), `insurer · ${e.stage.replace("_", " ")}`, e.message));
+        break;
+    }
+  }
+  flush();
+  $("feed").replaceChildren(...rows);
+  $("recorder-clock").textContent = events.length ? at(events[events.length - 1]) : "";
+  scrollDown(document.querySelector(".recorder"));
 }
 
 function setBusy(busy) {
@@ -221,7 +349,7 @@ async function send(event) {
     renderAttachments();
     $("demo").open = false;
   } catch (err) {
-    addBubble("error", err.message);
+    addEntry("error", err.message);
     setBusy(false);
   }
 }
@@ -258,16 +386,14 @@ async function attachFromDock(name) {
 
 function renderDock() {
   $("dock").hidden = !state.dock;
-  document.querySelector(".layout").classList.toggle("with-dock", Boolean(state.dock));
   if (!state.dock) return;
   $("dock-docs").replaceChildren(...state.dock.docs.map((d) => {
     const item = el("li", {
-      class: `dock-doc${d.sent ? " sent" : ""}`, draggable: "true", tabindex: "0", role: "button",
-      title: d.sent ? "Already sent to the agent. You can send it again." : "Drag into the message box, or click to add",
+      class: `doc${d.sent ? " sent" : ""}`, draggable: "true", tabindex: "0", role: "button",
+      title: d.sent ? "Already sent to the agent. You can send it again." : "Drag onto the pad, or click to add",
     },
       el("img", { src: fixtureUrl(d.name), alt: "", loading: "lazy" }),
-      el("span", { class: "dock-name", text: d.name }),
-      d.sent ? el("span", { class: "dock-sent", text: "✓ sent" }) : null);
+      el("span", { class: "doc-name", text: d.name.replace(/\.(png|jpe?g)$/i, "") }));
     item.addEventListener("dragstart", (e) => {
       e.dataTransfer.setData(DOC_TYPE, d.name);
       e.dataTransfer.effectAllowed = "copy";
@@ -352,23 +478,46 @@ function renderStatus(s) {
     ["Today", s.today],
     ["Skills", s.active_skills.join(", ") || "–"],
     ["Slots", `${s.slots.filled}/${s.slots.total}` + (s.slots.low_conf.length ? ` · low confidence: ${s.slots.low_conf.join(", ")}` : "")],
-    ["Asks", `${s.ask_budget.used}/${s.ask_budget.max}`],
+    ["Asks", `${s.ask_budget.used} of ${s.ask_budget.max} used`],
     ["Validation", s.validation.verdict + (s.validation.changed_since_last ? " (changed)" : "")],
     ["Approval", s.approval],
     ["Insurer", s.insurer.stage.replace("_", " ") + (s.insurer.ref ? ` · ${s.insurer.ref}` : "")],
-    ["Trace", `${t.model_calls} model calls · ${t.tool_calls} tool calls · ${t.input_tokens + t.output_tokens} tokens`],
   ];
   $("status-fields").replaceChildren(...fields.flatMap(([k, v]) => [el("dt", { text: k }), el("dd", { text: v })]));
 
   $("docs").replaceChildren(...(s.docs_checklist.length ? s.docs_checklist.map((d) =>
-    el("li", {}, el("span", { class: `state ${d.state}`, text: d.state }),
-      el("span", {}, d.name, d.reason ? el("div", { class: "reason", text: d.reason }) : null)))
+    el("li", {}, el("span", {}, d.name, d.reason ? el("span", { class: "reason-line", text: d.reason }) : null),
+      el("span", { class: `state ${d.state}`, text: d.state })))
     : [el("li", { class: "muted", text: "Known once the change type is clear." })]));
 
   const c = s.context;
-  $("meter-fill").style.width = `${Math.min(100, (100 * c.uncompressed_tool_results) / c.threshold)}%`;
+  $("pips").replaceChildren(...Array.from({ length: c.threshold }, (_, i) =>
+    el("i", { class: i < c.uncompressed_tool_results ? "full" : "" })));
   $("meter-text").textContent = `${c.uncompressed_tool_results}/${c.threshold} uncompressed tool results` +
-    (c.last_compressed_at ? ` · last compressed ${new Date(c.last_compressed_at).toLocaleTimeString()}` : "");
+    (c.last_compressed_at ? ` · last squeezed ${new Date(c.last_compressed_at).toLocaleTimeString()}` : "");
+  $("tally").textContent = `${t.model_calls} model calls · ${t.tool_calls} tool calls · ${kTok(t.input_tokens + t.output_tokens)} tok`;
+}
+
+// --- recorded values and their sources -------------------------------------------------------
+
+// Each slot's latest value, with where it came from: a document (by file name) or the user.
+function latestSlots(events) {
+  const slots = new Map();
+  for (const e of events) if (e.type === "slot.recorded") slots.set(e.name, e);
+  return slots;
+}
+
+function sourceChip(source, events) {
+  if (source === "user_msg") return el("span", { class: "src you", text: "you" });
+  const id = source.startsWith("doc:") ? source.slice(4) : source;
+  return el("span", { class: "src", text: docName(id, events).replace(/\.(png|jpe?g)$/i, "") });
+}
+
+function renderSlots(events) {
+  const slots = [...latestSlots(events).values()];
+  $("slots").replaceChildren(...(slots.length
+    ? slots.flatMap((s) => [el("dt", { text: s.name }), el("dd", {}, el("span", { text: short(s.value, 60) }), sourceChip(s.source, events))])
+    : [el("dt", { class: "muted", text: "Nothing yet." })]));
 }
 
 // --- assignee --------------------------------------------------------------------------------
@@ -389,12 +538,12 @@ function renderAssignee(a) {
   const you = userName() || "You";
   const label = {
     agent: "AI Agent",
-    customer: `${you} (The Customer)`,
-    approver: `${you} (The Approver)`,
+    customer: `${you} (The Customer) 🧢`,
+    approver: `${you} (The Approver) 🎩`,
     insurer: a.name || "The insurer",
   }[a.role];
   $("assignee").textContent = label;
-  $("assignee").className = `assignee-badge ${a.role}`;
+  $("assignee").className = a.role;
 }
 
 window.userName = userName;
@@ -405,17 +554,21 @@ window.setUserName = setUserName;
 function showApproval(card) {
   $("approval-summary").textContent = card.summary;
   state.insurer = card.policy?.insurer || null;
+  const fromPolicy = () => el("span", { class: "src sys", text: "policy" });
+  const slots = latestSlots(state.events);
   const rows = [];
-  if (card.change_type) rows.push(["Change", card.change_type]);
+  if (card.change_type) rows.push(["Change", card.change_type, null]);
   if (card.policy) {
-    rows.push(["Policy", `${card.policy.policy_no} · ${card.policy.insurer}`]);
-    rows.push(["Holder now", card.policy.holder_name]);
-    if (card.policy.nominee_name) rows.push(["Nominee now", card.policy.nominee_name]);
+    rows.push(["Policy", `${card.policy.policy_no} · ${card.policy.insurer}`, fromPolicy()]);
+    rows.push(["Holder now", card.policy.holder_name, fromPolicy()]);
+    if (card.policy.nominee_name) rows.push(["Nominee now", card.policy.nominee_name, fromPolicy()]);
   }
-  for (const [k, v] of Object.entries(card.details)) rows.push([k, short(v, 120)]);
-  for (const [k, v] of Object.entries(card.slots)) rows.push([k, v]);
-  for (const [k, v] of Object.entries(card.waivers)) rows.push([`${k} (waived)`, v]);
-  $("approval-diff").replaceChildren(...rows.map(([k, v]) => el("tr", {}, el("th", { text: k }), el("td", { text: v }))));
+  for (const [k, v] of Object.entries(card.details)) rows.push([k, short(v, 120), null]);
+  for (const [k, v] of Object.entries(card.slots)) rows.push([k, v, slots.has(k) ? sourceChip(slots.get(k).source, state.events) : null]);
+  for (const [k, v] of Object.entries(card.waivers)) rows.push([`${k} (waived)`, v, null]);
+  const head = el("tr", {}, ...["Field", "Value", "Source"].map((h) => el("th", { text: h })));
+  $("approval-diff").replaceChildren(el("thead", {}, head), el("tbody", {}, ...rows.map(([k, v, src]) =>
+    el("tr", {}, el("td", { text: k }), el("td", { text: v }), el("td", {}, src)))));
   $("approval-reason").value = "";
   $("approval").hidden = false;
   $("approval").scrollIntoView({ behavior: "smooth", block: "nearest" });
@@ -431,11 +584,29 @@ async function decide(decision) {
   setBusy(true);
   try {
     await api(`/api/sessions/${state.sid}/approval`, { decision, reason });
+    await stamp(decision);
     $("approval").hidden = true;
   } catch (err) {
-    addBubble("error", err.message);
+    addEntry("error", err.message);
     setBusy(false);
   }
+}
+
+// The decision lands as a rubber stamp on the form before it is filed away.
+const STAMPS = { approved: ["Approved", "--ok"], changes_requested: ["Changes", "--warn"], rejected: ["Rejected", "--stamp"] };
+
+async function stamp(decision) {
+  const [text, color] = STAMPS[decision];
+  const mark = $("big-stamp");
+  mark.textContent = text;
+  mark.style.color = `var(${color})`;
+  mark.classList.remove("on");
+  $("approval").classList.remove("thud");
+  void mark.offsetWidth;  // restart the animation
+  mark.classList.add("on");
+  $("approval").classList.add("thud");
+  await new Promise((r) => setTimeout(r, 900));
+  mark.classList.remove("on");
 }
 
 // --- trace and replay ------------------------------------------------------------------------
@@ -455,10 +626,11 @@ function renderTrace() {
     } else if (e.type === "tool.called") {
       const r = results.get(e.call_id);
       const skill = skillOf(e.tool, e.args);
+      const flag = MARKS.has(e.tool) || (r && isRefused(r.content));
       const body = el("details", {}, el("summary", { text: short(e.args, 50) }),
         el("pre", { text: `args: ${JSON.stringify(e.args, null, 1)}\n\nresult: ${r ? r.content : "(running)"}` }),
         skill ? el("p", { class: "small" }, "Skill: ", refLink("skill", skill)) : null);
-      rows.push(el("tr", {}, el("td", { class: "mono", text: at }), el("td", { class: "mono" }, refLink("tool", e.tool)),
+      rows.push(el("tr", { class: flag ? "flag" : "" }, el("td", { class: "mono", text: at }), el("td", { class: "mono" }, refLink("tool", e.tool)),
         el("td", {}, body), el("td", { class: "mono", text: r ? secs(ms(e.ts, r.ts)) : "…" }), el("td", { text: "" })));
     } else if (e.type === "context.compressed") {
       rows.push(el("tr", {}, el("td", { class: "mono", text: at }), el("td", { text: "compression" }),
@@ -469,7 +641,10 @@ function renderTrace() {
   $("trace").replaceChildren(el("thead", {}, head), el("tbody", {}, ...rows));
   const models = ev.filter((e) => e.type === "model.called");
   const tokens = models.reduce((n, e) => n + (e.input_tokens || 0) + (e.output_tokens || 0), 0);
-  $("trace-totals").textContent = `${models.length} model calls · ${ev.filter((e) => e.type === "tool.called").length} tool calls · ${tokens} tokens`;
+  const tools = ev.filter((e) => e.type === "tool.called").length;
+  $("receipt-head").textContent = `${state.sid || ""} · ${start ? new Date(start).toLocaleString() : "nothing yet"}`;
+  $("trace-totals").replaceChildren(el("span", { text: `TOTAL · ${models.length} MODEL + ${tools} TOOL CALLS` }),
+    el("span", { text: `${tokens.toLocaleString()} TOK` }));
 }
 
 // Replay plays the session's own events back into the chat and activity feed (ADR-0008).
@@ -479,15 +654,18 @@ async function replay() {
   selectTab("chat");
   $("chat").replaceChildren();
   $("feed").replaceChildren();
-  state.feedRows.clear();
+  state.calls.clear();
   state.draft = null;
+  state.note = null;
   const events = state.events.slice();
   for (let i = 0; i < events.length; i++) {
     showEvent(events[i], events);
+    renderRecorder(events.slice(0, i + 1));
     const gap = i + 1 < events.length ? ms(events[i].ts, events[i + 1].ts) : 0;
     await new Promise((r) => setTimeout(r, Math.min(800, Math.max(60, gap / 4))));
   }
   for (const e of state.events.slice(events.length)) showEvent(e, state.events);  // arrived meanwhile
+  renderRecorder(state.events);
   state.replaying = false;
 }
 
@@ -509,17 +687,21 @@ function ctxLinks(it) {
   return el("p", { class: "small ctx-docs" }, "Docs: ", ...parts.flatMap((p, i) => (i ? [", ", p] : [p])));
 }
 
+// Why an item left the prompt, stamped on its envelope.
+const ONFILE = { status: "superseded", tool: "compressed · on file", upload: "stubbed" };
+
 async function renderContext() {
   if (!state.sid) return;
   const items = await fetch(`/api/sessions/${state.sid}/context`).then((r) => r.json());
   $("context").replaceChildren(...items.map((it) => {
-    const label = `${it.kind}${it.note ? ` · ${it.note}` : ""}${it.in_prompt ? "" : " · left the prompt"}`;
+    const head = [el("span", { class: "k", text: `${it.kind}${it.note ? ` · ${it.note}` : ""}` }),
+      it.in_prompt ? null : el("span", { class: "onfile", text: ONFILE[it.kind] || "left the prompt" })];
     const long = it.text.length > 400 || it.kind === "system";
     const pre = el("pre", { text: it.text });
     const links = ctxLinks(it);
-    const body = long ? el("details", {}, el("summary", { text: `${label} (${it.text.length} chars)` }), pre, links)
-      : el("div", {}, el("strong", { class: "small", text: label }), pre, links);
-    return el("div", { class: `ctx ${it.in_prompt ? "in" : "out"}` }, body);
+    const body = long ? el("details", {}, el("summary", {}, ...head, el("span", { class: "small muted", text: ` ${it.text.length} chars` })), pre, links)
+      : el("div", {}, ...head, pre, links);
+    return el("div", { class: `ctx ${it.kind} ${it.in_prompt ? "in" : "out"}` }, body);
   }));
 }
 
