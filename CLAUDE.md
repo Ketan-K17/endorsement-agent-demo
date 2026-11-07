@@ -60,6 +60,7 @@ Update this block when a step finishes.
 - [ ] 5. API + SSE + UI (ADR-0018; backend live-checked on case 05; UI awaiting a browser check by the user). Run with `uv run uvicorn endorsement_agent.api:create_app --factory --port 7860`
 - [ ] 5b. Agent Documentation tab for tools/skills (ADR-0020); awaiting a browser check by the user
 - [ ] 5c. Case Desk UI restyle (ADR-0021): ruled chat pad, flight recorder, in-tray, case file; awaiting a browser check by the user
+- [ ] 5d. Revisit cases in a sitting and survive reloads (ADR-0022): `?case=` URL, header case picker; awaiting a browser check by the user
 - [ ] 6. Evals + nightly runs
 - [ ] 7. Deploy to Hugging Face Spaces with limits (needs credentials sign-off)
 

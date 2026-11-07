@@ -236,6 +236,11 @@ def create_app(make_agent: Callable[[str], Agent] | None = None) -> FastAPI:
         sessions[case_id] = Session(new_agent(case_id))
         return {"session_id": case_id}
 
+    # Lets a reload or a switch back check a remembered case is still in memory (ADR-0022).
+    @app.get("/api/sessions/{session_id}")
+    def lookup(session_id: str) -> dict[str, Any]:
+        return {"session_id": session_id, "busy": session(session_id).busy}
+
     @app.get("/api/sessions/{session_id}/stream")
     async def stream(
         session_id: str, after: int = 0, last_event_id: str | None = Header(None)

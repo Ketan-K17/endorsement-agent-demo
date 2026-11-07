@@ -113,7 +113,10 @@ th { font: 700 0.68rem var(--type); text-transform: uppercase; letter-spacing: 0
 .sub { margin: 0; font-size: 0.82rem; color: #4b3b20; }
 .top-actions { display: flex; gap: 0.5rem; align-items: center; }
 .top-actions button.ghost { color: #2b2112; border-color: #2b2112; }
-#session-id { font-size: 0.75rem; color: #4b3b20; margin-right: 0.3rem; }
+.cases {
+  max-width: 17rem; font-size: 0.75rem; color: #2b2112; background: transparent;
+  border: 1.5px dashed #2b2112; border-radius: 6px; padding: 0.38rem 0.5rem; cursor: pointer;
+}
 
 .tabs { display: flex; gap: 4px; padding: 10px 20px 0; overflow-x: auto; }
 .tabs button {

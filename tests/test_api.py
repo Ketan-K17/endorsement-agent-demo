@@ -71,6 +71,30 @@ async def test_unknown_session_is_404() -> None:
     assert (await http.post("/api/sessions/nope/messages", json={"text": "hi"})).status_code == 404
 
 
+async def test_a_session_can_be_looked_up_by_id() -> None:
+    http, _ = await client([])
+    sid = await new_session(http)
+    assert (await http.get(f"/api/sessions/{sid}")).json() == {"session_id": sid, "busy": False}
+    assert (await http.get("/api/sessions/nope")).status_code == 404
+
+
+async def test_an_earlier_case_replays_in_full_after_another_is_opened() -> None:
+    http, session = await client([AIMessage(content="Hi.")])
+    first = await new_session(http)
+    await http.post(f"/api/sessions/{first}/messages", json={"text": "hi"})
+    await finish(session(first))
+    second = await new_session(http)
+    await http.post(f"/api/sessions/{second}/messages", json={"text": "other case"})
+    await finish(session(second))
+
+    # a reload or a switch back connects from the start and gets the whole log
+    backlog = await until(session(first).stream(0), "status")
+    types = [m["data"].get("type") for m in backlog[:-1]]
+    assert types == ["case.created", "message.user", "model.called", "message.assistant"]
+    assert backlog[1]["data"]["text"] == "hi"
+    assert backlog[-1]["data"]["current_activity"] == "idle"
+
+
 async def test_a_message_streams_events_status_and_the_reply() -> None:
     http, session = await client([calls(call("get_case", "g1")), AIMessage(content="Hello.")])
     sid = await new_session(http)

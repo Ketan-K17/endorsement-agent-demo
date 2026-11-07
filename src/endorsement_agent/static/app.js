@@ -13,11 +13,12 @@ const state = {
   draft: null,          // the assistant entry's text receiving tokens
   note: null,           // the margin note collecting the current model step's tool calls
   calls: new Map(),     // call_id -> {line, node} in a margin note
-  attachments: [],      // {filename, mime, data (base64), dock (doc name if it came from the dock)}
+  attachments: [],      // {filename, mime, data (base64)}
   dock: null,           // {caseId, docs: [{name, sent}]}: the demo case's documents, added at will
   busy: false,
   replaying: false,
-  status: null,         // the last status bar, so a name change can re-render the assignee
+  live: false,          // past the replayed backlog of the case's stream
+  status: null,        // the last status bar, so a name change can re-render the assignee
   submitted: null,      // insurer ref just submitted, celebrated when the turn settles
   insurer: null,        // the insurer named on the last approval card
 };
@@ -103,26 +104,66 @@ function scrollDown(node) { node.scrollTop = node.scrollHeight; }
 
 // --- session ---------------------------------------------------------------------------------
 
-async function newSession() {
+// Cases live in server memory until it restarts (ADR-0022). The page only needs a case id to
+// show one: the stream replays its whole event log. The id sits in the URL (?case=), so a reload
+// re-attaches, and this browser keeps a short list of its cases to switch between.
+const CASES_KEY = "cases";
+const MAX_CASES = 12;
+const gone = (sid) => `Case ${sid} isn't on the server any more. Cases live in memory, so a restart clears them.`;
+
+function savedCases() {
+  try { return JSON.parse(localStorage.getItem(CASES_KEY)) || []; } catch { return []; }
+}
+
+function saveCases(cases) {
+  try { localStorage.setItem(CASES_KEY, JSON.stringify(cases.slice(0, MAX_CASES))); } catch { /* storage blocked: no list */ }
+  renderCases();
+}
+
+// Newest first; an update keeps the case where it is.
+function rememberCase(id, patch = {}) {
+  const cases = savedCases();
+  const i = cases.findIndex((c) => c.id === id);
+  if (i < 0) cases.unshift({ id, label: "", dock: null, ...patch });
+  else cases[i] = { ...cases[i], ...patch };
+  saveCases(cases);
+}
+
+async function pruneCases() {
+  const cases = savedCases();
+  const alive = await Promise.all(cases.map((c) => fetch(`/api/sessions/${encodeURIComponent(c.id)}`).then((r) => r.ok, () => true)));
+  saveCases(cases.filter((_, i) => alive[i]));
+}
+
+function renderCases() {
+  const cases = savedCases();
+  $("cases").replaceChildren(...cases.map((c) => el("option", { value: c.id, text: c.label ? `${c.id} · ${c.label}` : c.id })));
+  $("cases").value = state.sid || "";
+  $("cases").hidden = !cases.length;
+}
+
+function resetView() {
   if (state.source) state.source.close();
-  Object.assign(state, { events: [], lastSeq: 0, draft: null, note: null, busy: false, attachments: [], submitted: null });
+  Object.assign(state, { sid: null, source: null, events: [], lastSeq: 0, draft: null, note: null, live: false, attachments: [], submitted: null });
   state.calls.clear();
-  if (state.dock) for (const d of state.dock.docs) d.sent = false;  // a new case has seen none of them
-  renderDock();
+  setBusy(false);
   for (const id of ["chat", "feed", "trace", "context"]) $(id).replaceChildren();
   $("approval").hidden = true;
   $("pad-title").textContent = "Case notes";
-  $("pad-date").textContent = new Date().toLocaleDateString([], { weekday: "short", day: "numeric", month: "short", year: "numeric" });
+  $("pad-date").textContent = "";
   $("recorder-clock").textContent = "";
   renderSlots([]);
   renderAttachments();
-  const { session_id } = await api("/api/sessions");
-  state.sid = session_id;
-  $("session-id").textContent = session_id;
-  const source = new EventSource(`/api/sessions/${session_id}/stream`);
+}
+
+function connect(sid) {
+  state.sid = sid;
+  history.replaceState(null, "", `?case=${encodeURIComponent(sid)}${location.hash}`);
+  renderCases();
+  const source = new EventSource(`/api/sessions/${encodeURIComponent(sid)}/stream`);
   source.addEventListener("event", (m) => onCaseEvent(JSON.parse(m.data)));
   source.addEventListener("token", (m) => onToken(JSON.parse(m.data).text));
-  source.addEventListener("status", (m) => renderStatus(JSON.parse(m.data)));
+  source.addEventListener("status", (m) => onStatus(JSON.parse(m.data)));
   source.addEventListener("turn", (m) => onTurn(JSON.parse(m.data)));
   source.addEventListener("agent_error", (m) => {
     addEntry("error", JSON.parse(m.data).message);
@@ -131,14 +172,53 @@ async function newSession() {
   state.source = source;
 }
 
+// A new case keeps the in-tray, with none of its documents sent yet.
+async function newCase() {
+  if (state.replaying) return;
+  const dock = state.dock?.caseId ?? null;
+  resetView();
+  const { session_id } = await api("/api/sessions");
+  setDock(dock);
+  rememberCase(session_id, { dock });
+  connect(session_id);
+}
+
+// False if the server no longer has the case.
+async function openCase(sid) {
+  if (sid === state.sid) return true;
+  const r = await fetch(`/api/sessions/${encodeURIComponent(sid)}`);
+  if (!r.ok) {
+    saveCases(savedCases().filter((c) => c.id !== sid));
+    return false;
+  }
+  resetView();
+  setDock(savedCases().find((c) => c.id === sid)?.dock ?? null);
+  rememberCase(sid);
+  connect(sid);
+  return true;
+}
+
+async function start() {
+  await Promise.all([loadDemo(), pruneCases()]);
+  const wanted = new URLSearchParams(location.search).get("case");
+  if (wanted && (await openCase(wanted))) return;
+  await newCase();
+  if (wanted) addEntry("error", `${gone(wanted)} This is a new one.`);
+}
+
 // --- stream handlers -------------------------------------------------------------------------
 
 function onCaseEvent(e) {
   if (e.seq <= state.lastSeq) return;  // a reconnect may resend
   state.lastSeq = e.seq;
   state.events.push(e);
+  if (e.type === "case.created") $("pad-date").textContent = new Date(e.ts).toLocaleDateString([], { weekday: "short", day: "numeric", month: "short", year: "numeric" });
   if (e.type === "insurer.submitted") state.submitted = e.ref;
-  if (e.type === "policy.selected") $("pad-title").textContent = `Case notes · ${e.policy.policy_no}`;
+  if (e.type === "policy.selected") {
+    $("pad-title").textContent = `Case notes · ${e.policy.policy_no}`;
+    rememberCase(state.sid, { label: e.policy.policy_no });
+  }
+  if (e.type === "document.uploaded") markSent(e.filename);
   if (e.type === "slot.recorded" || e.type === "document.uploaded") renderSlots(state.events);
   if (!state.replaying) {
     showEvent(e, state.events);
@@ -178,6 +258,17 @@ function onToken(text) {
   if (!state.draft) state.draft = addEntry("assistant", "", [], true);
   state.draft.textContent += text;
   scrollDown($("chat"));
+}
+
+// The first status closes the replayed backlog: what came before it already happened, so a
+// submission in it is not celebrated again.
+function onStatus(s) {
+  if (!state.live) {
+    state.live = true;
+    state.submitted = null;
+    if (!$("tab-context").hidden) renderContext();
+  }
+  renderStatus(s);
 }
 
 function onTurn(turn) {
@@ -339,11 +430,6 @@ async function send(event) {
   try {
     const files = state.attachments.map(({ filename, mime, data }) => ({ filename, mime, data }));
     await api(`/api/sessions/${state.sid}/messages`, { text, files });
-    for (const a of state.attachments) {
-      const doc = state.dock?.docs.find((d) => d.name === a.dock);
-      if (doc) doc.sent = true;
-    }
-    renderDock();
     $("text").value = "";
     state.attachments = [];
     renderAttachments();
@@ -365,9 +451,9 @@ function toBase64(blob) {
   });
 }
 
-async function attach(filename, blob, dock = null) {
+async function attach(filename, blob) {
   const mime = blob.type === "image/jpeg" ? "image/jpeg" : "image/png";
-  state.attachments.push({ filename, mime, data: await toBase64(blob), dock });
+  state.attachments.push({ filename, mime, data: await toBase64(blob) });
   renderAttachments();
 }
 
@@ -377,10 +463,26 @@ async function attach(filename, blob, dock = null) {
 // decides when, and in what order, the agent sees them. Re-sending one is allowed on purpose.
 const DOC_TYPE = "application/x-dock-doc";
 const fixtureUrl = (name) => `/fixtures/${state.dock.caseId}/${name}`;
+let demoCases = [];
+
+// Which demo case's documents are in the tray. Sent marks come from the case's own uploads.
+function setDock(caseId) {
+  const c = demoCases.find((d) => d.id === caseId);
+  state.dock = c ? { caseId, docs: c.docs.map((name) => ({ name, sent: false })) } : null;
+  for (const e of state.events) if (e.type === "document.uploaded") markSent(e.filename, false);
+  renderDock();
+}
+
+function markSent(filename, render = true) {
+  const doc = state.dock?.docs.find((d) => d.name === filename);
+  if (!doc || doc.sent) return;
+  doc.sent = true;
+  if (render) renderDock();
+}
 
 async function attachFromDock(name) {
   const blob = await fetch(fixtureUrl(name)).then((r) => r.blob());
-  await attach(name, blob, name);
+  await attach(name, blob);
   $("text").focus();
 }
 
@@ -433,13 +535,14 @@ function renderAttachments() {
 
 async function loadDemo() {
   const demo = await fetch("/api/demo").then((r) => r.json());
+  demoCases = demo.cases;
   $("demo-cases").replaceChildren(...demo.cases.map((c) => {
     const use = el("button", { type: "button", class: "ghost", text: `Use (${c.docs.length} docs)` });
     use.onclick = () => {
       state.attachments = [];
       renderAttachments();
-      state.dock = { caseId: c.id, docs: c.docs.map((name) => ({ name, sent: false })) };
-      renderDock();
+      setDock(c.id);
+      if (state.sid) rememberCase(state.sid, { dock: c.id });
       $("text").value = c.starter;
       $("text").focus();
     };
@@ -813,9 +916,13 @@ $("file-input").addEventListener("change", async (e) => {
 });
 wireDrop($("composer"));
 $("approval").querySelectorAll("button").forEach((b) => (b.onclick = () => decide(b.dataset.decision)));
-$("new-case").onclick = newSession;
+$("new-case").onclick = newCase;
+$("cases").onchange = async (e) => {
+  const sid = e.target.value;
+  if (state.replaying) return renderCases();
+  if (!(await openCase(sid))) addEntry("error", gone(sid));
+};
 $("replay").onclick = replay;
 
-loadDemo();
-newSession();
+start();
 routeHash();
